@@ -261,16 +261,13 @@ def plot_diagnostics(backend, outfile):
                 ax.scatter(xticks, 100*acceptance_frac, 
                            s=7**2,
                            )
-
         ax.scatter([], [], s=7**2, edgecolor='k', facecolor='white', label=r'rj move')
         ax.scatter([], [], s=7**2, edgecolor='k', facecolor='k', label=r'moves')
-
         ax.set_xlabel(r'walkers')
         ax.set_xticks(xticks)
         ax.set_ylabel(r'Acceptance fraction')
         ax.legend(loc='best')
         ax.set_box_aspect(1)
-
         filename = '/'.join(outfile.split('/')[:-1])+'/AcceptanceFraction_temp%i'%t+outfile.split('/')[-1]
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
@@ -278,15 +275,69 @@ def plot_diagnostics(backend, outfile):
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for w in range(backend.nwalkers):
         ax.plot(backend.get_log_like()[:, 0, w], label=w)
-
     ax.set_xlabel(r'Iterations')
     ax.set_ylabel(r'Log-likelihood')
     ax.legend(loc='best')
     ax.set_box_aspect(1)
-
     filename = '/'.join(outfile.split('/')[:-1])+'/LogLikeConvergence'+outfile.split('/')[-1]
     plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
+
+    ## Posterior checks ##
+    # Number of vertices
+    backend_nleaves = backend.get_nleaves()
+    bins = np.linspace(0, backend.nleaves_max['tri'])
+    fig, ax = plt.subplots(1, 1, figsize=(6,6))
+    for t in range(backend.ntemps):
+        nvertices = backend_nleaves['tri'][:,t,:].ravel()
+        hist, _ = np.histogram(nvertices, bins=bins)
+        ax.stairs(hist, bins, label='temp %i' %t)
+    ax.axvline(x=4, color='gray', linestyle='--')
+    ax.axvline(x=backend.nleaves_max['tri'], color='gray', linestyle='--')
+    ax.set_xlabel(r'Number of vertices')
+    ax.set_ylabel(r'')
+    ax.legend(loc='best')
+    ax.set_box_aspect(1)
+    filename = '/'.join(outfile.split('/')[:-1])+'/Nvertices'+outfile.split('/')[-1]
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
+
+    # Corner weights
+    chains = backend.get_chain()
+    bins = np.linspace(-6,9,31)
+    fig, ax = plt.subplots(1, 1, figsize=(6,6))
+    for t in range(backend.ntemps):
+        corner_weights = np.array([chains["corners"][step, t, walker]
+                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
+                                   ]).ravel()
+        hist, _ = np.histogram(corner_weights, bins=bins)
+        ax.stairs(hist, bins, label='temp %i' %t)
+    ax.axvline(x=-6, color='gray', linestyle='--')
+    ax.axvline(x=9, color='gray', linestyle='--')
+    ax.set_xlabel(r'Corner weights')
+    ax.set_ylabel(r'')
+    ax.legend(loc='best')
+    ax.set_box_aspect(1)
+    filename = '/'.join(outfile.split('/')[:-1])+'/CornerWeights'+outfile.split('/')[-1]
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
+
+    # Vertices weights
+    inds = backend.get_inds()
+    bins = np.linspace(-6,9,31)
+    fig, ax = plt.subplots(1, 1, figsize=(6,6))
+    for t in range(backend.ntemps):
+        vertice_weights = np.concatenate([chains["tri"][step, t, walker][inds["tri"][step, t, walker]][:,-1]
+                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
+                                   ])
+        hist, _ = np.histogram(vertice_weights, bins=bins)
+        ax.stairs(hist, bins, label='temp %i' %t)
+    ax.axvline(x=-6, color='gray', linestyle='--')
+    ax.axvline(x=9, color='gray', linestyle='--')
+    ax.set_xlabel(r'Vertices weights')
+    ax.set_ylabel(r'')
+    ax.legend(loc='best')
+    ax.set_box_aspect(1)
+    filename = '/'.join(outfile.split('/')[:-1])+'/VerticesWeights'+outfile.split('/')[-1]
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
 def plot_maps(triangulations, selected_tris, outfile):
