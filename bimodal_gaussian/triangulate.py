@@ -396,8 +396,58 @@ def plot_maps(triangulations, selected_tris, outfile):
         ax.set_title(r'Reconstructed log-rate (%.2f quantile)' %q)
         ax.set_box_aspect(1)
 
-        filename = '/'.join(outfile.split('/')[:-1])+'/lograte_q%.2f_'%q+outfile.split('/')[-1]
+        filename = '/'.join(outfile.split('/')[:-1])+'/lograte_q%.2f'%q+outfile.split('/')[-1]
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
+
+
+def plot_Nevents(triangulations, Nevents, outfile):
+    """
+    """
+    def compute_num_events(triangulation_points):
+        tri = delaunaytor.CPUDelaunayInterpolator()
+        tri.triangulate(triangulation_points)
+        weights_in_vertices = tri.weights[tri.triangulation.simplices]
+        weight_diffs = np.c_[
+            (weights_in_vertices[:, 1] - weights_in_vertices[:, 2]),
+            (weights_in_vertices[:, 2] - weights_in_vertices[:, 0]),
+            (weights_in_vertices[:, 0] - weights_in_vertices[:, 1]),
+        ]
+        bar_integral = (np.exp(weights_in_vertices) * weight_diffs).sum(axis=-1) / (
+            -weight_diffs
+        ).prod(axis=-1)
+        return (2 * tri.volumes() * bar_integral).sum()
+    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+
+    #####################################
+    # Plotting parameters
+    fs = 12
+    lw = 1.4
+    plt.rcParams['font.size']=fs
+    plt.rcParams['font.family']='serif'
+    plt.rcParams['font.serif']='cmr10'
+    plt.rcParams['mathtext.fontset']='cm'
+    plt.rcParams['axes.unicode_minus']=False
+    plt.rcParams['axes.formatter.use_mathtext']=True
+    plt.rcParams['lines.linewidth']=lw
+    plt.rcParams['xtick.labelsize']=fs
+    plt.rcParams['ytick.labelsize']=fs
+    plt.rcParams['legend.fontsize']=.9*fs
+
+    fig, ax = plt.subplots(1, 1, figsize=(6,6))
+
+    hist, bins = np.histogram(estimated_num_events)
+    ax.stairs(hist, bins)
+
+    ax.axvline(Nevents, color='r')
+
+    ax.set_xlabel('Estimated number of events')
+    #ax.set_xlim(xmin=0,xmax=1)
+    ax.set_ylabel('N')
+    #ax.legend(loc='upper right')
+    ax.set_box_aspect(1)
+
+    filename = '/'.join(outfile.split('/')[:-1])+'/Nevents'+outfile.split('/')[-1]
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
 def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
@@ -477,7 +527,7 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
         ax.legend(loc='upper right')
         ax.set_box_aspect(1)
 
-        filename = '/'.join(outfile.split('/')[:-1])+'/marginals%i_'%(n+1)+outfile.split('/')[-1]
+        filename = '/'.join(outfile.split('/')[:-1])+'/marginals%i'%(n+1)+outfile.split('/')[-1]
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
@@ -531,6 +581,8 @@ if __name__ == "__main__":
     if os.path.exists(outfile):
         print('Loading samples from:', outfile)
         samples = np.loadtxt(outfile)
+        Nevents_det = int(len(samples)/args.Nsamples)
+        print('Number of detected events:', Nevents_det)
     else:
         raise ValueError("File %s could not be found." %outfile)
     event_limits = np.arange(0,len(samples),args.Nsamples)
@@ -672,6 +724,9 @@ if __name__ == "__main__":
         # Plot some diagnostics of the sampling
         outfile = os.path.join(plot_dir, '_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
         plot_diagnostics(backend, outfile)
+
+        # Plot the estimated number of events
+        plot_Nevents(triangulations, Nevents=args.Nevents, outfile=outfile)
         
         # Plot the reconstructed pdf
         plot_maps(triangulations, selected_tris, outfile=outfile)

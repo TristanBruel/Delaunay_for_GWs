@@ -413,6 +413,56 @@ def plot_diagnostics(backend, outfile):
     plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
+def plot_Nevents(triangulations, Nevents, outfile):
+    """
+    """
+    def compute_num_events(triangulation_points):
+        tri = delaunaytor.CPUDelaunayInterpolator()
+        tri.triangulate(triangulation_points)
+        weights_in_vertices = tri.weights[tri.triangulation.simplices]
+        weight_diffs = np.c_[
+            (weights_in_vertices[:, 1] - weights_in_vertices[:, 2]),
+            (weights_in_vertices[:, 2] - weights_in_vertices[:, 3]),
+            (weights_in_vertices[:, 3] - weights_in_vertices[:, 0]),
+            (weights_in_vertices[:, 0] - weights_in_vertices[:, 1]),
+        ]
+        bar_integral = (np.exp(weights_in_vertices) * weight_diffs).sum(axis=-1) / (
+            -weight_diffs
+        ).prod(axis=-1)
+        return (2 * tri.volumes() * bar_integral).sum()
+    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+
+    #####################################
+    # Plotting parameters
+    fs = 12
+    lw = 1.4
+    plt.rcParams['font.size']=fs
+    plt.rcParams['font.family']='serif'
+    plt.rcParams['font.serif']='cmr10'
+    plt.rcParams['mathtext.fontset']='cm'
+    plt.rcParams['axes.unicode_minus']=False
+    plt.rcParams['axes.formatter.use_mathtext']=True
+    plt.rcParams['lines.linewidth']=lw
+    plt.rcParams['xtick.labelsize']=fs
+    plt.rcParams['ytick.labelsize']=fs
+    plt.rcParams['legend.fontsize']=.9*fs
+
+    fig, ax = plt.subplots(1, 1, figsize=(6,6))
+
+    hist, bins = np.histogram(estimated_num_events)
+    ax.stairs(hist, bins)
+
+    ax.axvline(Nevents, color='r')
+
+    ax.set_xlabel('Estimated number of events')
+    #ax.set_xlim(xmin=0,xmax=1)
+    ax.set_ylabel('N')
+    #ax.legend(loc='upper right')
+    ax.set_box_aspect(1)
+
+    filename = '/'.join(outfile.split('/')[:-1])+'/Nevents'+outfile.split('/')[-1]
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
+
 
 def plot_maps(triangulations, selected_tris, outfile):
     """
@@ -470,7 +520,7 @@ def plot_maps(triangulations, selected_tris, outfile):
         ax.set_title(r'Reconstructed log-rate (%.2f quantile)' %q)
         ax.set_box_aspect(1)
 
-        filename = '/'.join(outfile.split('/')[:-1])+'/lograte_q%.2f_'%q+outfile.split('/')[-1]
+        filename = '/'.join(outfile.split('/')[:-1])+'/lograte_q%.2f'%q+outfile.split('/')[-1]
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
@@ -612,14 +662,14 @@ if __name__ == "__main__":
     if os.path.exists(outfile):
         print('Loading samples from:', outfile)
         samples = np.loadtxt(outfile)
+        Nevents_det = int(len(samples)/args.Nsamples)
+        print('Number of detected events:', Nevents_det)
     else:
         raise ValueError("File %s could not be found." %outfile)
     event_limits = np.arange(0,len(samples),args.Nsamples)
     event_barycenters = (
         np.add.reduceat(samples, event_limits, axis=0) /args.Nsamples
     )
-    # Simulate injections
-    detected_injections, injection_priors = make_injections(args.Ninjections, samples, p_det=p_det)
 
     corners = np.array([[0.,0.,0.,],[100.,0.,0.],
                         [0.,1.,0.],[100.,1.,0.],
@@ -631,21 +681,6 @@ if __name__ == "__main__":
     nleaves_min = {"tri": 8, "corners": 1}
     nleaves_max = {"tri": 100, "corners": 1}
 
-    # Set likelihood
-    priors = set_uniform_priors(corners, ndims)
-    event_logpriors = np.ones(samples.shape[0])
-    log_like_fn = SquareLogLikelihood(
-            corners=corners,
-            events=samples,
-            events_log_prior=event_logpriors,
-            detected_injections=detected_injections,
-            detected_injections_prior=injection_priors,
-            num_events=len(samples)//args.Nsamples,
-            num_samples=args.Nsamples,
-            num_injections=args.Ninjections,
-            minus_infinity=-1e300,
-            )
-
     # Actually start sampling
     filename = 'backend_events%i_samples%i' %(args.Nevents,args.Nsamples)
     backend_file = os.path.join(work_dir, filename)
@@ -655,6 +690,24 @@ if __name__ == "__main__":
             backend = pickle.load(f)
         last_sample = backend.get_last_sample()
     else:
+        # Simulate injections
+        detected_injections, injection_priors = make_injections(args.Ninjections, samples, p_det=p_det)
+
+        # Set likelihood
+        priors = set_uniform_priors(corners, ndims)
+        event_logpriors = np.ones(samples.shape[0])
+        log_like_fn = SquareLogLikelihood(
+                corners=corners,
+                events=samples,
+                events_log_prior=event_logpriors,
+                detected_injections=detected_injections,
+                detected_injections_prior=injection_priors,
+                num_events=len(samples)//args.Nsamples,
+                num_samples=args.Nsamples,
+                num_injections=args.Ninjections,
+                minus_infinity=-1e300,
+                )
+
         # Initialize
         coords = {}
         inds = {}
@@ -737,7 +790,8 @@ if __name__ == "__main__":
             np.vstack([triangulations[ind],np.c_[corners, corner_weights[ind].T]])
             for ind in range(len(triangulations))
             ]
-    selected_tris = np.random.choice(len(triangulations), size=args.nwalkers*args.nsteps, replace=False)
+    #selected_tris = np.random.choice(len(triangulations), size=args.nwalkers*args.nsteps, replace=False)
+    selected_tris = np.random.choice(len(triangulations), size=1000, replace=False)
         
     if args.show_plots:
         # Plot final delaunay of one walker
@@ -755,6 +809,9 @@ if __name__ == "__main__":
         # Plot some diagnostics of the sampling
         outfile = os.path.join(plot_dir, '_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
         plot_diagnostics(backend, outfile)
+
+        # Plot the estimated number of events
+        plot_Nevents(triangulations, Nevents=args.Nevents, outfile=outfile)
         
         # Plot the reconstructed pdf
         #plot_maps(triangulations, selected_tris, outfile=outfile)
