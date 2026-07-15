@@ -367,6 +367,8 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples
         shifted = observed_events + distro_errors.rvs(size=observed_events.shape[0])
         samples = np.repeat(shifted, Nsamples, axis=0) + distro_errors.rvs(size=shifted.shape[0]*Nsamples)
         np.savetxt(outfile_samples, samples)
+
+    print('Number of detected events:', len(observed_events))
     return observed_events, samples
 
 
@@ -444,7 +446,7 @@ if __name__ == "__main__":
                         default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
                         )
     # Set detection probability
-    parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=3)
+    parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=5)
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)

@@ -52,7 +52,7 @@ class SquareLogLikelihood(delaunaytor.DelaunayLogLikelihood):
         return super().__call__(triangulation_parameters)
 
 
-def make_injections(Ninjections, observed_events, p_det):
+def make_injections(Ninjections, observed_events, pdet):
     """
     """
     print('Number of injections:', Ninjections)
@@ -69,7 +69,7 @@ def make_injections(Ninjections, observed_events, p_det):
                 scale=[dX, dY, dZ],
             ).rvs(size=(Ninjections, 3))
 
-    detected_injections = all_injection_events[np.random.random(Ninjections) < p_det(all_injection_events)]
+    detected_injections = all_injection_events[np.random.random(Ninjections) < pdet(all_injection_events)]
     print('Number of detected injections:', len(detected_injections))
     injection_priors = np.ones(detected_injections.shape[0]) / (dX * dY * dZ)
     return detected_injections, injection_priors
@@ -155,7 +155,7 @@ def initial_delaunay_proposal(event_barycenters, corners, nstart,
 
 
 def plot_delaunay(event_barycenters, delaunay_proposal, corners,
-                  plot3d, title, outfile,
+                  title, outfile,
                   ):
     """
     Plot events and a proposal of Delaunay triangulation scheme.
@@ -182,75 +182,35 @@ def plot_delaunay(event_barycenters, delaunay_proposal, corners,
     cmap = plt.get_cmap('magma')
     norm = mpl.colors.Normalize(vmin=-10,vmax=20)
 
-    if plot3d:
-        fig = plt.figure(figsize=(6,6))
-        ax = plt.axes(projection='3d')
+    fig = plt.figure(figsize=(6,6))
+    ax = plt.axes(projection='3d')
 
-        ax.scatter(event_barycenters[:,0], 
-                   event_barycenters[:,1],
-                   event_barycenters[:,2],
-                   c='k', marker='*', s=7**2,
-                   )
+    ax.scatter(event_barycenters[:,0], 
+               event_barycenters[:,1],
+               event_barycenters[:,2],
+               c='k', marker='*', s=7**2,
+               )
 
-        ax.scatter(vertices[:,0], vertices[:,1], vertices[:,2],
-                   c=cmap(norm(weights)), zorder=10,
-                   )
-        ## Own-made triplot in 3D ##
-        edges = get_edges(d.simplices)
-        tri_lines_x = np.insert(vertices[edges,0], 2, np.nan, axis=1)
-        tri_lines_y = np.insert(vertices[edges,1], 2, np.nan, axis=1)
-        tri_lines_z = np.insert(vertices[edges,2], 2, np.nan, axis=1)
-        tri_lines = ax.plot(tri_lines_x.ravel(), 
-                            tri_lines_y.ravel(),
-                            tri_lines_z.ravel(),
-                            color="fuchsia", ls="-",alpha=0.9,
-                            )
+    ax.scatter(vertices[:,0], vertices[:,1], vertices[:,2],
+               c=cmap(norm(weights)), zorder=10,
+               )
+    ## Own-made triplot in 3D ##
+    edges = get_edges(d.simplices)
+    tri_lines_x = np.insert(vertices[edges,0], 2, np.nan, axis=1)
+    tri_lines_y = np.insert(vertices[edges,1], 2, np.nan, axis=1)
+    tri_lines_z = np.insert(vertices[edges,2], 2, np.nan, axis=1)
+    tri_lines = ax.plot(tri_lines_x.ravel(), 
+                        tri_lines_y.ravel(),
+                        tri_lines_z.ravel(),
+                        color="fuchsia", ls="-",alpha=0.9,
+                        )
 
-
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(xmin=0., xmax=100)
-        ax.set_ylabel('$q$')
-        ax.set_ylim(ymin=0., ymax=1.)
-        ax.set_zlabel('$z$')
-        ax.set_zlim(zmin=0., zmax=1.5)
-
-    else:
-        fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        ax.scatter(event_barycenters[:,0], event_barycenters[:,1], 
-                   c='k', marker='*', s=10**2,
-                   )
-        ax.scatter(
-            vertices[:, 0], vertices[:, 1], 
-            c=cmap(norm(weights)), zorder=10,
-        )
-        ax.triplot(
-            vertices[:, 0], vertices[:, 1], 
-            #d.simplices,
-            color="fuchsia", ls="-",alpha=0.9,
-        )
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(xmin=0., xmax=100)
-        ax.set_ylabel('$q$')
-        ax.set_ylim(ymin=0., ymax=1.)
-        ax.set_box_aspect(1)
-
-        fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        ax.scatter(event_barycenters[:,0], event_barycenters[:,2],
-                   c='k', marker='*', s=10**2,
-                   )
-        ax.scatter(
-            vertices[:, 0], vertices[:, 2],
-            c=cmap(norm(weights)), zorder=10,
-        )
-        ax.triplot(
-            vertices[:, 0], vertices[:, 2], 
-            #d.simplices,
-            color="fuchsia", ls="-",alpha=0.9,
-        )
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(xmin=0., xmax=100)
-        ax.set_ylabel('$z$')
-        ax.set_box_aspect(1)
+    ax.set_xlabel(r'x')
+    ax.set_xlim(xmin=-10, xmax=10)
+    ax.set_ylabel(r'y')
+    ax.set_ylim(ymin=-10, ymax=10)
+    ax.set_zlabel(r'z')
+    ax.set_zlim(zmin=-10, zmax=10)
 
     ax.set_title(title)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -529,15 +489,16 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
     """
     n_triangulations = len(selected_tris)
 
-    xgrid = np.linspace(0,100,101)
-    ygrid = np.linspace(0.01,1,21)
-    zgrid = np.linspace(0.01,1,11)
+    xgrid = np.linspace(-10,10,101)
+    ygrid = np.linspace(-10,10,101)
+    zgrid = np.linspace(-10,10,101)
     X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     grid = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
     dx = xgrid[1] - xgrid[0]
     dy = ygrid[1] - ygrid[0]
     dz = zgrid[1] - zgrid[0]
 
+    ## Inferred event rate ##
     log10_dNdx = np.zeros((n_triangulations, xgrid.shape[0]))
     log10_dNdy = np.zeros((n_triangulations, ygrid.shape[0]))
     log10_dNdz = np.zeros((n_triangulations, zgrid.shape[0]))
@@ -549,11 +510,23 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
         log10_dNdy[ind] = (special.logsumexp(log_rate, axis=(1,2)) + np.log(dx) + np.log(dz)) / np.log(10)
         log10_dNdz[ind] = (special.logsumexp(log_rate, axis=(0,1)) + np.log(dx) + np.log(dy)) / np.log(10)
 
+    ## Prior rate ##
+    log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
+    log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
+    log10_dNdz_prior = np.zeros((len(prior), ygrid.shape[0]))
+    for ind in range(len(prior)):
+        this_delo = delaunaytor.CPUDelaunayInterpolator()
+        this_delo.triangulate(prior[ind])
+        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
+        log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy) + np.log(dz)) / np.log(10)
+        log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx) + np.log(dz)) / np.log(10)
+        log10_dNdz_prior[ind] = (special.logsumexp(log_rate, axis=2) + np.log(dx) + np.log(dy)) / np.log(10)
+
     ## Compute `astro' marginals
     astro_samples = astro_pop.rvs(100_000)
-    x_pdf_astro, xbins = np.histogram(astro_samples[:, 0], density=True, bins=100)
-    y_pdf_astro, ybins = np.histogram(astro_samples[:, 1], density=True, bins=100)
-    z_pdf_astro, zbins = np.histogram(astro_samples[:, 2], density=True, bins=100)
+    x_pdf_astro, _ = np.histogram(astro_samples[:, 0], density=True, bins=xgrid)
+    y_pdf_astro, _ = np.histogram(astro_samples[:, 1], density=True, bins=ygrid)
+    z_pdf_astro, _ = np.histogram(astro_samples[:, 2], density=True, bins=zgrid)
     x_rate_astro = x_pdf_astro * Nevents
     y_rate_astro = y_pdf_astro * Nevents
     z_rate_astro = z_pdf_astro * Nevents
@@ -575,23 +548,26 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
     plt.rcParams['legend.fontsize']=.9*fs
 
 
-    x_labels = ['$m_1$', '$q$', '$z$']
-    xlims = [[0.,100.],[0.,1.],[0.,1.]]
+    x_labels = [r'x', r'y', r'z']
     grids = [xgrid,ygrid,zgrid]
-    y_labels = ['$\\rm{log}_{10}\\rm{dN}/\\rm{d}m_1$', 
-                '$\\rm{log}_{10}\\rm{dN}/\\rm{d}q$',
+    y_labels = ['$\\rm{log}_{10}\\rm{dN}/\\rm{d}x$', 
+                '$\\rm{log}_{10}\\rm{dN}/\\rm{d}y$',
                 '$\\rm{log}_{10}\\rm{dN}/\\rm{d}z$'
                 ]
+    prior_rates = [log10_dNdx_prior,log10_dNdy_prior]
     astro_rates = [x_rate_astro,y_rate_astro,z_rate_astro]
-    all_bins = [xbins,ybins,zbins]
     for n,data in enumerate([log10_dNdx,log10_dNdy,log10_dNdz]):
         low = np.quantile(data, 0.05, axis=0)
         median = np.quantile(data, 0.5, axis=0)
         high = np.quantile(data, 0.95, axis=0)
 
+        low_prior = np.quantile(prior_rates[n], 0.05, axis=0)
+        median_prior = np.quantile(prior_rates[n], 0.5, axis=0)
+        high_prior = np.quantile(prior_rates[n], 0.95, axis=0)
+
         fig, ax = plt.subplots(1, 1, figsize=(6,6))
 
-        mid_bins = (all_bins[n][:-1]+all_bins[n][1:]) /2
+        mid_bins = (grids[n][:-1]+grids[n][1:]) /2
         ax.plot(mid_bins, np.log10(astro_rates[n]), 
                 color="black", ls="--",
                 label=r"`Astro' pop",
@@ -603,8 +579,14 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
                         label='Reconstructed',
                         )
 
+        ax.plot(grids[n], median_prior, color="forestgreen", alpha=0.5)
+        ax.fill_between(grids[n], low_prior, high_prior,
+                        color="forestgreen", alpha=0.25,
+                        label='Prior',
+                        )
+
         ax.set_xlabel(x_labels[n])
-        ax.set_xlim(xlims[n])
+        ax.set_xlim(xmin=-10, xmax=10)
         ax.set_ylabel(y_labels[n])
         ax.legend(loc='best')
         ax.set_box_aspect(1)
@@ -627,29 +609,30 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Set 'astro' population
-    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([10.,0.8,0.2]))
+    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,5,-2]))
     parser.add_argument("--cov1", dest='cov1', help="Covariance matrix of first distribution",
-                        default=np.array([[100.,0,0],[0,0.01,0],[0,0,0.01]]),
+                        default=np.array([[5,2,0],[2,1,0],[0,0,1.5]]),
                         )
-    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([70.,0.5,0.5]))
+    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,6]))
     parser.add_argument("--cov2", dest='cov2', help="Covariance matrix of second distribution",
-                        default=np.array([[100.,0,0],[0,0.01,0],[0,0,0.01]]),
+                        default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
                         )
+    # Set detection probability
+    parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=5)
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Injections
     parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=10_000_000)
     # Initial Delaunay
-    parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=16)
+    parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=9)
     # Sampling
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=4)
     parser.add_argument("--temps", dest='ntemps', help="Number of temperatures", type=int, default=2)
-    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=10_000)
-    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=5_000)
+    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=20_000)
+    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=10_000)
     # Show the plots
     parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
-    parser.add_argument("--3D", dest='plot3d', action='store_true', help="Plot pdf in 3D")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -657,7 +640,8 @@ if __name__ == "__main__":
             level=logging.DEBUG,
             )
 
-    filename = 'events%i_samples%i.txt' %(args.Nevents,args.Nsamples)
+    pdet = lambda events: p_det(events, sigma=args.sigma_det)
+    filename = 'samples.txt'
     outfile = os.path.join(work_dir,filename)
     if os.path.exists(outfile):
         print('Loading samples from:', outfile)
@@ -681,6 +665,24 @@ if __name__ == "__main__":
     nleaves_min = {"tri": 8, "corners": 1}
     nleaves_max = {"tri": 100, "corners": 1}
 
+    # Simulate injections
+    detected_injections, injection_priors = make_injections(args.Ninjections, samples, pdet=pdet)
+
+    # Set likelihood
+    priors = set_uniform_priors(corners, ndims)
+    event_logpriors = np.ones(samples.shape[0])
+    log_like_fn = SquareLogLikelihood(
+            corners=corners,
+            events=samples,
+            events_log_prior=event_logpriors,
+            detected_injections=detected_injections,
+            detected_injections_prior=injection_priors,
+            num_events=len(samples)//args.Nsamples,
+            num_samples=args.Nsamples,
+            num_injections=args.Ninjections,
+            minus_infinity=-1e300,
+            )
+
     # Actually start sampling
     filename = 'backend_events%i_samples%i' %(args.Nevents,args.Nsamples)
     backend_file = os.path.join(work_dir, filename)
@@ -690,24 +692,6 @@ if __name__ == "__main__":
             backend = pickle.load(f)
         last_sample = backend.get_last_sample()
     else:
-        # Simulate injections
-        detected_injections, injection_priors = make_injections(args.Ninjections, samples, p_det=p_det)
-
-        # Set likelihood
-        priors = set_uniform_priors(corners, ndims)
-        event_logpriors = np.ones(samples.shape[0])
-        log_like_fn = SquareLogLikelihood(
-                corners=corners,
-                events=samples,
-                events_log_prior=event_logpriors,
-                detected_injections=detected_injections,
-                detected_injections_prior=injection_priors,
-                num_events=len(samples)//args.Nsamples,
-                num_samples=args.Nsamples,
-                num_injections=args.Ninjections,
-                minus_infinity=-1e300,
-                )
-
         # Initialize
         coords = {}
         inds = {}
@@ -740,8 +724,8 @@ if __name__ == "__main__":
             # Plot initial delaunay
             outfile = os.path.join(plot_dir, 'InitialDelaunayProposal_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
             plot_delaunay(event_barycenters, init_proposal, corners,
-                          plot3d=args.plot3d, title=r'Initial Delaunay Proposal', outfile=outfile,
-                      )
+                          title=r'Initial Delaunay Proposal', outfile=outfile,
+                          )
 
         # Define moves for the sampling
         moves, rj_moves = define_moves(event_barycenters, nleaves_min, nleaves_max, priors)
@@ -803,7 +787,7 @@ if __name__ == "__main__":
 
         outfile = os.path.join(plot_dir, 'FinalDelaunayProposal_walker%i_events%i_samples%i.png' %(ind,args.Nevents,args.Nsamples))
         plot_delaunay(event_barycenters, final_proposal, corners, 
-                      plot3d=args.plot3d, title=r'Final Delaunay Proposal - walker %i' %ind, outfile=outfile,
+                      title=r'Final Delaunay Proposal - walker %i' %ind, outfile=outfile,
                       )
 
         # Plot some diagnostics of the sampling
@@ -818,6 +802,17 @@ if __name__ == "__main__":
 
         # Plot the marginal distributions and compare with `astro' pop
         astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-        plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, Nevents=args.Nevents, outfile=outfile)
+        triangulation_prior = np.zeros(1000, dtype=object)
+        for t in trange(len(triangulation_prior)):
+            le_log = -np.inf
+            for _ in range(10_000):
+                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
+                                                          priors, ndims,
+                )
+                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
+                if le_log > -1e300:
+                    triangulation_prior[t] = np.vstack([init_proposal['tri'],np.c_[corners,init_proposal['corners'].T]])
+                    break
+        plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulation_prior, Nevents=args.Nevents, outfile=outfile)
 
         plt.show()
