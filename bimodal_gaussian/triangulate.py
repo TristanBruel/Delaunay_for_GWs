@@ -95,10 +95,10 @@ def set_uniform_priors(corners, ndims):
                 1: uniform_dist(
                     corners[:, 1].min(), corners[:, 1].max()
                 ),
-                2: uniform_dist(-6, 9)
+                2: uniform_dist(-12, 8)
                 },
             "corners": {
-                d: uniform_dist(-6, 9) for d in range(ndims["corners"])
+                d: uniform_dist(-12, 8) for d in range(ndims["corners"])
                 }
             }
     return priors
@@ -151,7 +151,7 @@ def plot_delaunay(event_barycenters, delaunay_proposal, corners,
                )
 
     cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-6,vmax=9)
+    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
 
     ax.scatter(
         vertices[:, 0], vertices[:, 1], 
@@ -291,7 +291,7 @@ def plot_diagnostics(backend, outfile):
 
     # Corner weights
     chains = backend.get_chain()
-    bins = np.linspace(-6,9,31)
+    bins = np.linspace(-12,8,21)
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         corner_weights = np.array([chains["corners"][step, t, walker]
@@ -299,8 +299,8 @@ def plot_diagnostics(backend, outfile):
                                    ]).ravel()
         hist, _ = np.histogram(corner_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-6, color='gray', linestyle='--')
-    ax.axvline(x=9, color='gray', linestyle='--')
+    ax.axvline(x=-12, color='gray', linestyle='--')
+    ax.axvline(x=8, color='gray', linestyle='--')
     ax.set_xlabel(r'Corner weights')
     ax.set_ylabel(r'')
     ax.legend(loc='best')
@@ -310,7 +310,7 @@ def plot_diagnostics(backend, outfile):
 
     # Vertices weights
     inds = backend.get_inds()
-    bins = np.linspace(-6,9,31)
+    bins = np.linspace(-12,8,21)
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         vertice_weights = np.concatenate([chains["tri"][step, t, walker][inds["tri"][step, t, walker]][:,-1]
@@ -318,8 +318,8 @@ def plot_diagnostics(backend, outfile):
                                    ])
         hist, _ = np.histogram(vertice_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-6, color='gray', linestyle='--')
-    ax.axvline(x=9, color='gray', linestyle='--')
+    ax.axvline(x=-12, color='gray', linestyle='--')
+    ax.axvline(x=8, color='gray', linestyle='--')
     ax.set_xlabel(r'Vertices weights')
     ax.set_ylabel(r'')
     ax.legend(loc='best')
@@ -349,7 +349,7 @@ def plot_maps(triangulations, selected_tris, outfile):
     plt.rcParams['legend.fontsize']=.9*fs
 
     cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-6,vmax=9)
+    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
 
     xgrid = np.linspace(-10,10,101)
     ygrid = np.linspace(-10,10,101)
@@ -369,7 +369,7 @@ def plot_maps(triangulations, selected_tris, outfile):
     for q in quantiles:
         data = np.quantile(square_rate, q, axis=0)
         fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        c = ax.pcolormesh(xgrid, ygrid, data[:-1, :-1], vmin=-6, vmax=9)
+        c = ax.pcolormesh(xgrid, ygrid, data[:-1, :-1], vmin=-12, vmax=8)
         cbar = fig.colorbar(c, ax=ax,
                             cmap=cmap, norm=norm,
                             fraction=0.086, pad=0.04, aspect=10,
@@ -748,7 +748,7 @@ if __name__ == "__main__":
         # Plot the marginal distributions 
         # Compare with `astro' pop and priors
         astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-        triangulation_prior = np.zeros(100, dtype=object)
+        triangulation_prior = np.zeros(1000, dtype=object)
         for t in trange(len(triangulation_prior)):
             le_log = -np.inf
             for _ in range(10_000):
