@@ -571,7 +571,7 @@ if __name__ == "__main__":
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Injections
-    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=100_000)
+    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=1_000_000)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=6)
     # Sampling

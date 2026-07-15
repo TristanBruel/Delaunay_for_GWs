@@ -127,14 +127,14 @@ def plot_pdf(pop, plot3d=False, outfile=None):
     plt.rcParams['legend.fontsize']=.9*fs
 
     cmap = plt.get_cmap('viridis')
-    norm = mpl.colors.Normalize(vmin=0,vmax=0.1)
 
-    xgrid = np.linspace(0,100,101)
-    ygrid = np.linspace(0.01,1,21)
-    zgrid = np.linspace(0.01,1,11)
+    xgrid = np.linspace(-10,10,21)
+    ygrid = np.linspace(-10,10,21)
+    zgrid = np.linspace(-10,10,21)
     X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     pdf = pop.pdf(np.array([X.flatten(),Y.flatten(),Z.flatten()]).T)
     pdf = pdf.reshape(X.shape)
+    norm = mpl.colors.Normalize(vmin=0,vmax=pdf.max())
 
     if plot3d:
         fig = plt.figure(figsize=(6,6))
@@ -145,16 +145,24 @@ def plot_pdf(pop, plot3d=False, outfile=None):
                         alpha=0.5,
                         )
         
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+        ax.set_zlabel(r'z')
+        ax.set_zlim(-10,10)
+        ax.set_title("`Astro' Population")
 
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(0,100)
-        ax.set_ylabel('$q$')
-        ax.set_ylim(0,1)
-        ax.set_zlabel('$z$')
-        ax.set_zlim(0,1)
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        cbar = fig.colorbar(sm, ax=ax,
+                            fraction=0.086, pad=0.04, aspect=10,
+                            )
+        cbar.set_label(r'pdf')
+        cbar.ax.tick_params(labelsize=0.8*fs)
 
     else:
         fig, axes = plt.subplots(1, 3, figsize=(14,4))
+
         ax=axes[0]
         X, Y = np.meshgrid(xgrid, ygrid)
         data = np.trapezoid(x=zgrid, y=pdf, axis=2)
@@ -163,10 +171,11 @@ def plot_pdf(pop, plot3d=False, outfile=None):
                     levels=100,
                    )
         ax.contour(X, Y, data, colors='k')
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(0,100)
-        ax.set_ylabel('$q$')
-        ax.set_ylim(0,1)
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+
         ax=axes[1]
         Z, Y = np.meshgrid(zgrid,ygrid)
         data = np.trapezoid(x=xgrid, y=pdf, axis=1)
@@ -175,10 +184,11 @@ def plot_pdf(pop, plot3d=False, outfile=None):
                     levels=100,
                    )
         ax.contour(Z, Y, data, colors='k')
-        ax.set_xlabel('$z$')
-        ax.set_xlim(0,1)
-        ax.set_ylabel('$q$')
-        ax.set_ylim(0,1)
+        ax.set_xlabel(r'z')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+
         ax=axes[2]
         data = np.trapezoid(x=ygrid, y=pdf, axis=0)
         X, Z = np.meshgrid(xgrid, zgrid)
@@ -187,10 +197,11 @@ def plot_pdf(pop, plot3d=False, outfile=None):
                     levels=100,
                    )
         ax.contour(X, Z, data.T, colors='k')
-        ax.set_xlabel('$m_1$')
-        ax.set_xlim(0,100)
-        ax.set_ylabel('$z$')
-        ax.set_ylim(0,1)
+
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'z')
+        ax.set_ylim(-10,10)
 
         axes[1].set_title("`Astro' Population")
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
@@ -206,17 +217,11 @@ def plot_pdf(pop, plot3d=False, outfile=None):
     return fig
 
 
-def p_det(events):
-    ## Here we assume a detection probability linear in chirp mass, and evolving in Dl^-3 ##
-    events[...,1] = np.minimum(0.999, events[...,1]) # mass ratio cannot be > 1
-    events[...,1] = np.maximum(0.001, events[...,1]) # mass ratio cannot be negative
-    events[...,2] = np.maximum(0.001, events[...,2]) # redshift cannot be negative
-    chirp = events[...,0] *events[...,1]**(3/5) /(1+events[...,1])**(1/5)
-    Dl = events[...,2] *7000 # very rough model for the luminosity distance as a function of redshift
-    return (chirp/25) /(Dl/1000)**3 # 30-30 Msun at z~0.14 has pdet=1
+def p_det(events, sigma=3):
+    return np.exp(-np.sqrt(events[...,0]**2 + events[...,1]**2 + events[...,2]**2) /sigma)
 
 
-def plot_pdet(p_det, outfile=None):
+def plot_pdet(p_det, plot3d=False, outfile=None):
     """
     Plot the pdf of the detection probability.
     """
@@ -238,38 +243,89 @@ def plot_pdet(p_det, outfile=None):
 
     cmap = plt.get_cmap('viridis')
 
-    # 3D plot
-    fig = plt.figure(figsize=(6,6))
-    ax = plt.axes(projection='3d')
-
-    xgrid = np.linspace(0,100,101)
-    ygrid = np.linspace(0.01,1,21)
-    zgrid = np.linspace(0.01,1,11)
+    xgrid = np.linspace(-10,10,21)
+    ygrid = np.linspace(-10,10,21)
+    zgrid = np.linspace(-10,10,21)
     X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     pdet = p_det(np.array([X.flatten(),Y.flatten(),Z.flatten()]).T)
     pdet = pdet.reshape(X.shape)
+    norm = mpl.colors.Normalize(vmin=0,vmax=pdet.max())
 
-    sc = ax.scatter(X, Y, Z,
-                    c=pdet, cmap=cmap,
-                    alpha=0.5,
-                    )
+    if plot3d:
+        # 3D plot
+        fig = plt.figure(figsize=(6,6))
+        ax = plt.axes(projection='3d')
 
-
-    ax.set_xlabel('$m_1$')
-    ax.set_xlim(0,100)
-    ax.set_ylabel('$q$')
-    ax.set_ylim(0,1)
-    ax.set_zlabel('$z$')
-    ax.set_zlim(0,1)
-    ax.set_title('Detection probability')
-
-    sm = plt.cm.ScalarMappable(cmap=cmap)
-    cbar = fig.colorbar(sm, ax=ax,
-                        cmap=cmap,
-                        fraction=0.086, pad=0.04, aspect=10,
+        sc = ax.scatter(X, Y, Z,
+                        c=pdet, cmap=cmap,
+                        alpha=0.5,
                         )
-    cbar.set_label(r'pdet')
-    cbar.ax.tick_params(labelsize=0.8*fs)
+
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+        ax.set_zlabel(r'z')
+        ax.set_zlim(-10,10)
+        ax.set_title('Detection probability')
+
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        cbar = fig.colorbar(sm, ax=ax,
+                            cmap=cmap,
+                            fraction=0.086, pad=0.04, aspect=10,
+                            )
+        cbar.set_label(r'pdet')
+        cbar.ax.tick_params(labelsize=0.8*fs)
+
+    else:
+        fig, axes = plt.subplots(1, 3, figsize=(14,4))
+        ax=axes[0]
+        X, Y = np.meshgrid(xgrid, ygrid)
+        data = np.trapezoid(x=zgrid, y=pdet, axis=2)
+        ax.contourf(X, Y, data,
+                    cmap=cmap,
+                    levels=100,
+                   )
+        ax.contour(X, Y, data, colors='k')
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+
+        ax=axes[1]
+        Z, Y = np.meshgrid(zgrid,ygrid)
+        data = np.trapezoid(x=xgrid, y=pdet, axis=1)
+        ax.contourf(Z, Y, data,
+                    cmap=cmap,
+                    levels=100,
+                   )
+        ax.contour(Z, Y, data, colors='k')
+        ax.set_xlabel(r'z')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'y')
+        ax.set_ylim(-10,10)
+
+        ax=axes[2]
+        data = np.trapezoid(x=ygrid, y=pdet, axis=0)
+        X, Z = np.meshgrid(xgrid, zgrid)
+        ax.contourf(X, Z, data.T,
+                    cmap=cmap,
+                    levels=100,
+                   )
+        ax.contour(X, Z, data.T, colors='k')
+
+        ax.set_xlabel(r'x')
+        ax.set_xlim(-10,10)
+        ax.set_ylabel(r'z')
+        ax.set_ylim(-10,10)
+
+        axes[1].set_title('Detection probability')
+        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+        cbar = fig.colorbar(sm, ax=axes,
+                            fraction=0.086, pad=0.04, aspect=10,
+                            )
+        cbar.set_label(r'pdet')
+        cbar.ax.tick_params(labelsize=0.8*fs)
 
     plt.savefig(outfile, bbox_inches='tight', dpi=1200)
 
@@ -277,7 +333,7 @@ def plot_pdet(p_det, outfile=None):
 
 
 
-def sample_events(pop, Nevents, Nsamples, p_det, outfile):
+def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples):
     """
     Generate samples for a series of event from a given population.
 
@@ -295,27 +351,30 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile):
     3D array
        Samples representing measurements for the observed events
     """
-    if os.path.exists(outfile):
-        print('Loading samples from:', outfile)
-        samples = np.loadtxt(outfile)
+    if os.path.exists(outfile_events) and os.path.exists(outfile_samples):
+        print('Loading observed events from:', outfile_events)
+        observed_events = np.loadtxt(outfile_events)
+        print('Loading samples from:', outfile_samples)
+        samples = np.loadtxt(outfile_samples)
     else:
         print('Generating samples.')
         events = pop.rvs(size=Nevents)
         observed_events = events[np.random.random(events.shape[0]) < p_det(events)]
+        np.savetxt(outfile_events, observed_events)
         # For now we set the distribution of errors as a 2D gaussian
         distro_errors = stats.multivariate_normal(np.zeros(3), 1e-2*np.eye(3))
-        samples = np.repeat(observed_events, Nsamples, axis=0) + distro_errors.rvs(size=observed_events.shape[0]*Nsamples)
-        samples[...,1] = np.maximum(.01,samples[...,1])
-        samples[...,1] = np.minimum(1.,samples[...,1])
-        samples[...,2] = np.maximum(.01,samples[...,2])
-        np.savetxt(outfile, samples)
-    return samples
+        #samples = np.repeat(observed_events, Nsamples, axis=0) + distro_errors.rvs(size=observed_events.shape[0]*Nsamples)
+        shifted = observed_events + distro_errors.rvs(size=observed_events.shape[0])
+        samples = np.repeat(shifted, Nsamples, axis=0) + distro_errors.rvs(size=shifted.shape[0]*Nsamples)
+        np.savetxt(outfile_samples, samples)
+    return observed_events, samples
 
 
-def plot_samples(samples, Nsamples, outfile):
+def plot_samples(observed_events, samples, outfile):
     """
     Plot events.
     """
+    Nsamples = int(samples.shape[0] /observed_events.shape[0])
     event_limits = np.arange(0,len(samples),Nsamples)
     event_barycenters = (
             np.add.reduceat(samples, event_limits, axis=0) /Nsamples
@@ -340,19 +399,24 @@ def plot_samples(samples, Nsamples, outfile):
     fig = plt.figure(figsize=(6,6))
     ax = plt.axes(projection='3d')
 
-    sc = ax.scatter(event_barycenters[:,0], event_barycenters[:,1], event_barycenters[:,2],
-                    marker='*', s=7**2, c='k',
-                    zorder=100,
-                    )
+    ax.scatter(observed_events[:,0], observed_events[:,1], observed_events[:,2],
+            marker='.', s=2**2, c='r', zorder=100,
+            label='Observed events (real)',
+            )
 
+    ax.scatter(event_barycenters[:,0], event_barycenters[:,1], event_barycenters[:,2],
+            marker='*', s=7**2, c='k',
+            label='Samples (barycenters)',
+            )
 
-    ax.set_xlabel('$m_1$')
-    ax.set_xlim(0,100)
-    ax.set_ylabel('$q$')
-    ax.set_ylim(0,1)
-    ax.set_zlabel('$z$')
-    ax.set_zlim(0,1)
+    ax.set_xlabel(r'x')
+    ax.set_xlim(-10,10)
+    ax.set_ylabel(r'y')
+    ax.set_ylim(-10,10)
+    ax.set_zlabel(r'z')
+    ax.set_zlim(-10,10)
     ax.set_title(r'Events')
+    ax.legend(loc='upper right')
 
     plt.savefig(outfile, bbox_inches='tight', dpi=1200)
 
@@ -371,14 +435,16 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Set 'astro' population
-    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([10.,0.8,0.2]))
+    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,5,-2]))
     parser.add_argument("--cov1", dest='cov1', help="Covariance matrix of first distribution", 
-                        default=np.array([[25.,0,0],[0,0.01,0],[0,0,0.01]]),
+                        default=np.array([[5,2,0],[2,1,0],[0,0,1.5]]),
                         )
-    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([70.,0.5,0.5]))
+    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,6]))
     parser.add_argument("--cov2", dest='cov2', help="Covariance matrix of second distribution", 
-                        default=np.array([[100.,0,0],[0,0.01,0],[0,0,0.01]]),
+                        default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
                         )
+    # Set detection probability
+    parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=3)
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
@@ -391,9 +457,14 @@ if __name__ == "__main__":
     pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
 
     # Sample observable events
-    filename = 'events%i_samples%i.txt' %(args.Nevents,args.Nsamples)
-    outfile = os.path.join(work_dir,filename)
-    samples = sample_events(pop, args.Nevents, args.Nsamples, p_det, outfile)
+    pdet = lambda events: p_det(events, sigma=args.sigma_det)
+    filename = 'observed_events.txt'
+    outfile_events = os.path.join(work_dir,filename)
+    filename = 'samples.txt'
+    outfile_samples = os.path.join(work_dir,filename)
+    observed_events, samples = sample_events(pop, args.Nevents, args.Nsamples, pdet, 
+            outfile_events, outfile_samples,
+            )
 
     if args.show_plots:
         # Plot astro pop
@@ -401,12 +472,12 @@ if __name__ == "__main__":
         outfile = os.path.join(plot_dir,filename)
         fig_pop = plot_pdf(pop, args.plot3d, outfile)
         # Plot detection probability
-        filename = 'pdet.png'
+        filename = 'pdet' + args.plot3d*'_3D' + '.png'
         outfile = os.path.join(plot_dir,filename)
-        fig_pdet = plot_pdet(p_det, outfile)
+        fig_pdet = plot_pdet(p_det, args.plot3d, outfile)
         # Plot samples from observed events
         filename = 'events%i_samples%i.png' %(args.Nevents,args.Nsamples)
         outfile = os.path.join(plot_dir,filename)
-        fig_samples = plot_samples(samples, args.Nsamples, outfile)
+        fig_samples = plot_samples(observed_events, samples, outfile)
 
         plt.show()
