@@ -367,7 +367,6 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples
         shifted = observed_events + distro_errors.rvs(size=observed_events.shape[0])
         samples = np.repeat(shifted, Nsamples, axis=0) + distro_errors.rvs(size=shifted.shape[0]*Nsamples)
         np.savetxt(outfile_samples, samples)
-
     print('Number of detected events:', len(observed_events))
     return observed_events, samples
 
