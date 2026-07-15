@@ -234,7 +234,7 @@ def plot_pdet(pdet, plot3d=False, outfile=None):
 
 
 
-def sample_events(pop, Nevents, Nsamples, p_det, outfile):
+def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples):
     """
     Generate samples for a series of event from a given population.
 
@@ -252,21 +252,26 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile):
     2D array
        Samples representing measurements for the observed events
     """
-    if os.path.exists(outfile):
-        print('Loading samples from:', outfile)
-        samples = np.loadtxt(outfile)
+    if os.path.exists(outfile_events) and os.path.exists(outfile_samples):
+        print('Loading observed events from:', outfile_events)
+        observed_events = np.loadtxt(outfile_events)
+        print('Loading samples from:', outfile_samples)
+        samples = np.loadtxt(outfile_samples)
     else:
         print('Generating samples.')
         events = pop.rvs(size=Nevents)
         observed_events = events[np.random.random(events.shape[0]) < p_det(events)]
+        np.savetxt(outfile_events, observed_events)
         # For now we set the distribution of errors as a 2D gaussian
         distro_errors = stats.multivariate_normal(np.zeros(2), 1e-2*np.eye(2))
-        samples = np.repeat(observed_events, Nsamples, axis=0) + distro_errors.rvs(size=observed_events.shape[0]*Nsamples)
-        np.savetxt(outfile, samples)
-    return samples
+        #samples = np.repeat(observed_events, Nsamples, axis=0) + distro_errors.rvs(size=observed_events.shape[0]*Nsamples)
+        shifted = observed_events + distro_errors.rvs(size=observed_events.shape[0])
+        samples = np.repeat(shifted, Nsamples, axis=0) + distro_errors.rvs(size=shifted.shape[0]*Nsamples)
+        np.savetxt(outfile_samples, samples)
+    return observed_events, samples
 
 
-def plot_samples(samples, Nsamples, outfile):
+def plot_samples(observed_events, samples, Nsamples, outfile):
     """
     Plot events.
     """
@@ -295,30 +300,21 @@ def plot_samples(samples, Nsamples, outfile):
 
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
 
+    ax.scatter(observed_events[:,0], observed_events[:,1],
+            marker='.', s=2**2, c='r', zorder=100,
+            label='Observed events (real)',
+            )
+
     ax.scatter(event_barycenters[:,0], event_barycenters[:,1], 
-               marker='*', s=7**2, c='k',
-               zorder=100,
-               )
-
-    #xgrid = np.linspace(-10,10,201)
-    #ygrid = np.linspace(-10,10,201)
-    #X, Y = np.meshgrid(xgrid[:-1], ygrid[:-1])
-
-    #H, xedges, yedges = np.histogram2d(samples[:,0], samples[:,1],
-    #                                   bins=[xgrid, ygrid], density=True,
-    #                                   )
-    #H[H==0] = 1e-32
-    #im = ax.contourf(X, Y, H.T,
-    #                 levels=np.logspace(-3,0,10),
-    #                 cmap=cmap,
-    #                 norm=norm,
-    #                 )
+            marker='*', s=7**2, c='k',
+            label='Samples (barycenters)',
+            )
 
     ax.set_xlabel(r'x')
     ax.set_xlim(-10,10)
     ax.set_ylabel(r'y')
     ax.set_ylim(-10,10)
-    ax.set_title(r'Events')
+    ax.set_title(r'Events and samples')
 
     plt.savefig(outfile, bbox_inches='tight', dpi=1200)
 
@@ -361,9 +357,13 @@ if __name__ == "__main__":
 
     # Sample observable events
     pdet = lambda events: p_det(events, sigma=args.sigma_det)
-    filename = 'events%i_samples%i.txt' %(args.Nevents,args.Nsamples)
-    outfile = os.path.join(work_dir,filename)
-    samples = sample_events(pop, args.Nevents, args.Nsamples, pdet, outfile)
+    filename = 'observed_events.txt'
+    outfile_events = os.path.join(work_dir,filename)
+    filename = 'samples.txt'
+    outfile_samples = os.path.join(work_dir,filename)
+    observed_events, samples = sample_events(pop, args.Nevents, args.Nsamples, pdet, 
+            outfile_events, outfile_samples,
+            )
 
     if args.show_plots:
         # Plot astro pop
@@ -377,6 +377,6 @@ if __name__ == "__main__":
         # Plot samples from observed events
         filename = 'events%i_samples%i.png' %(args.Nevents,args.Nsamples)
         outfile = os.path.join(plot_dir,filename)
-        fig_samples = plot_samples(samples, args.Nsamples, outfile)
+        fig_samples = plot_samples(observed_events, samples, args.Nsamples, outfile)
 
         plt.show()

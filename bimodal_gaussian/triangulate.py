@@ -577,8 +577,8 @@ if __name__ == "__main__":
     # Sampling
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=4)
     parser.add_argument("--temps", dest='ntemps', help="Number of temperatures", type=int, default=2)
-    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=500)
-    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=500)
+    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=2000)
+    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=1000)
     # Show the plots
     parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
     args = parser.parse_args()
@@ -588,7 +588,7 @@ if __name__ == "__main__":
             level=logging.DEBUG,
             )
 
-    filename = 'events%i_samples%i.txt' %(args.Nevents,args.Nsamples)
+    filename = 'samples.txt'
     outfile = os.path.join(work_dir,filename)
     if os.path.exists(outfile):
         print('Loading samples from:', outfile)
