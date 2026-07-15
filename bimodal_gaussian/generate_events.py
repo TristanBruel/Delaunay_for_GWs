@@ -315,6 +315,7 @@ def plot_samples(observed_events, samples, Nsamples, outfile):
     ax.set_ylabel(r'y')
     ax.set_ylim(-10,10)
     ax.set_title(r'Events and samples')
+    ax.legend(loc='upper right')
 
     plt.savefig(outfile, bbox_inches='tight', dpi=1200)
 
