@@ -655,10 +655,10 @@ if __name__ == "__main__":
         np.add.reduceat(samples, event_limits, axis=0) /args.Nsamples
     )
 
-    corners = np.array([[0.,0.,0.,],[100.,0.,0.],
-                        [0.,1.,0.],[100.,1.,0.],
-                        [0.,0.,1.],[100.,0.,1.],
-                        [0.,1.,1.],[100.,1.,1.]])
+    corners = np.array([[-10,-10,-10,],[10,-10,-10],
+                        [-10,10,-10],[10,10,-10],
+                        [-10,-10,10],[10,-10,10],
+                        [-10,10,10],[10,10,10]])
     # Some properties of the delaunay sampling scheme
     branch_names = ["tri", "corners"]
     ndims = {"tri": 4, "corners": 8}
