@@ -484,7 +484,7 @@ def plot_maps(triangulations, selected_tris, outfile):
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
-def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
+def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, outfile):
     """
     """
     n_triangulations = len(selected_tris)
@@ -517,7 +517,7 @@ def plot_marginals(triangulations, selected_tris, astro_pop, Nevents, outfile):
     for ind in range(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
-        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
+        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0], zgrid.shape[0])
         log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy) + np.log(dz)) / np.log(10)
         log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx) + np.log(dz)) / np.log(10)
         log10_dNdz_prior[ind] = (special.logsumexp(log_rate, axis=2) + np.log(dx) + np.log(dy)) / np.log(10)
@@ -623,7 +623,7 @@ if __name__ == "__main__":
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Injections
-    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=10_000_000)
+    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=1_000_000)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=9)
     # Sampling
