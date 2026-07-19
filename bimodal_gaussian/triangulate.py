@@ -364,20 +364,3 @@ if __name__ == "__main__":
             with open(backend_file, "wb") as f:
                 pickle.dump(ensemble.backend, f)
             print('Saved to %s' %backend_file)
-            with open(backend_file, "rb") as f:
-                backend = pickle.load(f)
-
-    chain = backend.get_chain()
-    inds = backend.get_inds()
-    triangulations =  [
-            chain["tri"][step, 0, walker][inds["tri"][step, 0, walker]]
-            for step, walker in product(range(args.nsteps), range(backend.nwalkers))
-            ]
-    corner_weights = np.array([
-        chain["corners"][step, 0, walker]
-        for step, walker in product(range(args.nsteps), range(backend.nwalkers))
-        ])
-    triangulations = [
-            np.vstack([triangulations[ind],np.c_[corners, corner_weights[ind].T]])
-            for ind in range(len(triangulations))
-            ]

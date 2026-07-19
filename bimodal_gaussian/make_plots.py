@@ -6,6 +6,7 @@ import matplotlib as mpl
 
 from scipy import stats, special
 from scipy.spatial import Delaunay
+from local_utils import delaunaytor
 from generate_events import generate_pop, p_det
 from triangulate import set_uniform_priors, SquareLogLikelihood, make_injections, initial_delaunay_proposal
 
@@ -576,6 +577,7 @@ if __name__ == "__main__":
     plot_maps(triangulations, selected_tris, outfile=outfile)
 
     # Plot the marginal distributions 
+    astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
     plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulations_prior, Nevents=args.Nevents, outfile=outfile)
 
     if args.show_plots:
