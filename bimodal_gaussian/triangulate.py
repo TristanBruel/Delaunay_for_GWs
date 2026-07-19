@@ -1,8 +1,6 @@
 import numpy as np
 import pickle
 from itertools import product
-import matplotlib.pyplot as plt
-import matplotlib as mpl
 
 from scipy import stats, special
 from scipy.spatial import Delaunay
@@ -119,68 +117,6 @@ def initial_delaunay_proposal(event_barycenters, corners, nstart,
     return init_proposal
 
 
-def plot_delaunay(event_barycenters, delaunay_proposal, corners,
-                  title, outfile,
-                  ):
-    """
-    Plot events and a proposal of Delaunay triangulation scheme.
-    """
-    vertices = np.vstack([delaunay_proposal['tri'][:,:2], corners])
-    weights = np.concatenate([delaunay_proposal['tri'][:,2], delaunay_proposal['corners']])
-    d = Delaunay(vertices)
-
-    #####################################
-    # Plotting parameters
-    fs = 12
-    lw = 1.4
-    plt.rcParams['font.size']=fs
-    plt.rcParams['font.family']='serif'
-    plt.rcParams['font.serif']='cmr10'
-    plt.rcParams['mathtext.fontset']='cm'
-    plt.rcParams['axes.unicode_minus']=False
-    plt.rcParams['axes.formatter.use_mathtext']=True
-    plt.rcParams['lines.linewidth']=lw
-    plt.rcParams['xtick.labelsize']=fs
-    plt.rcParams['ytick.labelsize']=fs
-    plt.rcParams['legend.fontsize']=.9*fs
-
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-
-    ax.scatter(event_barycenters[:,0], event_barycenters[:,1], 
-               c='k', marker='*', s=10**2,
-               )
-
-    cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
-
-    ax.scatter(
-        vertices[:, 0], vertices[:, 1], 
-        c=cmap(norm(weights)), zorder=10,
-    )
-    ax.triplot(
-        vertices[:, 0], vertices[:, 1], d.simplices,
-        color="fuchsia", ls="-",alpha=0.9,
-    )
-
-    ax.set_xlabel(r'x')
-    #ax.set_xlim(xmin=-10, xmax=10)
-    ax.set_ylabel(r'y')
-    #ax.set_ylim(ymin=-10, ymax=10)
-    ax.set_title(title)
-    ax.set_box_aspect(1)
-
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-    cbar = fig.colorbar(sm, ax=ax, 
-                        cmap=cmap, norm=norm, 
-                        fraction=0.086, pad=0.04, aspect=10,
-                        )
-    cbar.set_label(r'weight')
-    cbar.ax.tick_params(labelsize=0.8*fs)
-
-    plt.savefig(outfile, bbox_inches='tight', dpi=1200)
-
-    return fig
-
 
 def define_moves(event_barycenters, nleaves_min, nleaves_max, priors):
     """
@@ -214,254 +150,15 @@ def define_moves(event_barycenters, nleaves_min, nleaves_max, priors):
 
 
 
-
-def plot_diagnostics(backend, outfile):
+def check_prior_range(astro_pop, Nevents, prior):
     """
     """
-    chain = backend.get_chain()
-
-    #####################################
-    # Plotting parameters
-    fs = 12
-    lw = 1.4
-    plt.rcParams['font.size']=fs
-    plt.rcParams['font.family']='serif'
-    plt.rcParams['font.serif']='cmr10'
-    plt.rcParams['mathtext.fontset']='cm'
-    plt.rcParams['axes.unicode_minus']=False
-    plt.rcParams['axes.formatter.use_mathtext']=True
-    plt.rcParams['lines.linewidth']=lw
-    plt.rcParams['xtick.labelsize']=fs
-    plt.rcParams['ytick.labelsize']=fs
-    plt.rcParams['legend.fontsize']=.9*fs
-
-    ## Acceptance fractions ##
-    for t in range(backend.ntemps):
-        fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        xticks = np.arange(backend.nwalkers)+1
-        for move in backend.get_move_info():
-            acceptance_frac = backend.get_move_info()[move]['acceptance_fraction'][t]
-            if 'RJ' in move:
-                ax.scatter(xticks, 100*acceptance_frac,
-                           s=7**2, edgecolor='k', facecolor='white',
-                           )
-            else:
-                ax.scatter(xticks, 100*acceptance_frac, 
-                           s=7**2,
-                           )
-        ax.scatter([], [], s=7**2, edgecolor='k', facecolor='white', label=r'rj move')
-        ax.scatter([], [], s=7**2, edgecolor='k', facecolor='k', label=r'moves')
-        ax.set_xlabel(r'walkers')
-        ax.set_xticks(xticks)
-        ax.set_ylabel(r'Acceptance fraction')
-        ax.legend(loc='best')
-        ax.set_box_aspect(1)
-        filename = '/'.join(outfile.split('/')[:-1])+'/AcceptanceFraction_temp%i'%t+outfile.split('/')[-1]
-        plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-    ## Log-likelihood convergence ##
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-    for w in range(backend.nwalkers):
-        ax.plot(backend.get_log_like()[:, 0, w], label=w)
-    ax.set_xlabel(r'Iterations')
-    ax.set_ylabel(r'Log-likelihood')
-    ax.legend(loc='best')
-    ax.set_box_aspect(1)
-    filename = '/'.join(outfile.split('/')[:-1])+'/LogLikeConvergence'+outfile.split('/')[-1]
-    plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-
-    ## Posterior checks ##
-    # Number of vertices
-    backend_nleaves = backend.get_nleaves()
-    bins = np.linspace(0, backend.nleaves_max['tri'])
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-    for t in range(backend.ntemps):
-        nvertices = backend_nleaves['tri'][:,t,:].ravel()
-        hist, _ = np.histogram(nvertices, bins=bins)
-        ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=4, color='gray', linestyle='--')
-    ax.axvline(x=backend.nleaves_max['tri'], color='gray', linestyle='--')
-    ax.set_xlabel(r'Number of vertices')
-    ax.set_ylabel(r'')
-    ax.legend(loc='best')
-    ax.set_box_aspect(1)
-    filename = '/'.join(outfile.split('/')[:-1])+'/Nvertices'+outfile.split('/')[-1]
-    plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-    # Corner weights
-    chains = backend.get_chain()
-    bins = np.linspace(-12,8,21)
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-    for t in range(backend.ntemps):
-        corner_weights = np.array([chains["corners"][step, t, walker]
-                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
-                                   ]).ravel()
-        hist, _ = np.histogram(corner_weights, bins=bins)
-        ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-12, color='gray', linestyle='--')
-    ax.axvline(x=8, color='gray', linestyle='--')
-    ax.set_xlabel(r'Corner weights')
-    ax.set_ylabel(r'')
-    ax.legend(loc='best')
-    ax.set_box_aspect(1)
-    filename = '/'.join(outfile.split('/')[:-1])+'/CornerWeights'+outfile.split('/')[-1]
-    plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-    # Vertices weights
-    inds = backend.get_inds()
-    bins = np.linspace(-12,8,21)
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-    for t in range(backend.ntemps):
-        vertice_weights = np.concatenate([chains["tri"][step, t, walker][inds["tri"][step, t, walker]][:,-1]
-                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
-                                   ])
-        hist, _ = np.histogram(vertice_weights, bins=bins)
-        ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-12, color='gray', linestyle='--')
-    ax.axvline(x=8, color='gray', linestyle='--')
-    ax.set_xlabel(r'Vertices weights')
-    ax.set_ylabel(r'')
-    ax.legend(loc='best')
-    ax.set_box_aspect(1)
-    filename = '/'.join(outfile.split('/')[:-1])+'/VerticesWeights'+outfile.split('/')[-1]
-    plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-
-def plot_maps(triangulations, selected_tris, outfile):
-    """
-    """
-    n_triangulations = len(selected_tris)
-
-    #####################################
-    # Plotting parameters
-    fs = 12
-    lw = 1.4
-    plt.rcParams['font.size']=fs
-    plt.rcParams['font.family']='serif'
-    plt.rcParams['font.serif']='cmr10'
-    plt.rcParams['mathtext.fontset']='cm'
-    plt.rcParams['axes.unicode_minus']=False
-    plt.rcParams['axes.formatter.use_mathtext']=True
-    plt.rcParams['lines.linewidth']=lw
-    plt.rcParams['xtick.labelsize']=fs
-    plt.rcParams['ytick.labelsize']=fs
-    plt.rcParams['legend.fontsize']=.9*fs
-
-    cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
-
     xgrid = np.linspace(-10,10,101)
     ygrid = np.linspace(-10,10,101)
     X, Y = np.meshgrid(xgrid, ygrid)
     grid = np.c_[X.ravel(), Y.ravel()]
     dx = xgrid[1] - xgrid[0]
     dy = ygrid[1] - ygrid[0]
-
-    log_rate = np.zeros((n_triangulations, grid.shape[0]))
-    for ind, tri_ind in enumerate(tqdm(selected_tris)):
-        this_delo = delaunaytor.CPUDelaunayInterpolator()
-        this_delo.triangulate(triangulations[tri_ind])
-        log_rate[ind] = this_delo.interpolate(grid)
-    square_rate = log_rate.reshape(n_triangulations, ygrid.shape[0], xgrid.shape[0])
-
-    quantiles = [0.05, 0.5, 0.95]
-    for q in quantiles:
-        data = np.quantile(square_rate, q, axis=0)
-        fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        c = ax.pcolormesh(xgrid, ygrid, data[:-1, :-1], vmin=-12, vmax=8)
-        cbar = fig.colorbar(c, ax=ax,
-                            cmap=cmap, norm=norm,
-                            fraction=0.086, pad=0.04, aspect=10,
-                            )
-        cbar.set_label(r'Log pdf')
-        cbar.ax.tick_params(labelsize=0.8*fs)
-
-        ax.set_xlabel(r'x')
-        ax.set_xlim(xmin=-10,xmax=10)
-        ax.set_ylabel(r'y')
-        ax.set_ylim(ymin=-10,ymax=10)
-        ax.set_title(r'Reconstructed log-rate (%.2f quantile)' %q)
-        ax.set_box_aspect(1)
-
-        filename = '/'.join(outfile.split('/')[:-1])+'/lograte_q%.2f'%q+outfile.split('/')[-1]
-        plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-
-def compute_num_events(triangulation_points):
-        tri = delaunaytor.CPUDelaunayInterpolator()
-        tri.triangulate(triangulation_points)
-        weights_in_vertices = tri.weights[tri.triangulation.simplices]
-        weight_diffs = np.c_[
-            (weights_in_vertices[:, 1] - weights_in_vertices[:, 2]),
-            (weights_in_vertices[:, 2] - weights_in_vertices[:, 0]),
-            (weights_in_vertices[:, 0] - weights_in_vertices[:, 1]),
-        ]
-        bar_integral = (np.exp(weights_in_vertices) * weight_diffs).sum(axis=-1) / (
-            -weight_diffs
-        ).prod(axis=-1)
-        return (2 * tri.volumes() * bar_integral).sum()
-
-
-def plot_Nevents(triangulations, Nevents, outfile):
-    """
-    """
-    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
-
-    #####################################
-    # Plotting parameters
-    fs = 12
-    lw = 1.4
-    plt.rcParams['font.size']=fs
-    plt.rcParams['font.family']='serif'
-    plt.rcParams['font.serif']='cmr10'
-    plt.rcParams['mathtext.fontset']='cm'
-    plt.rcParams['axes.unicode_minus']=False
-    plt.rcParams['axes.formatter.use_mathtext']=True
-    plt.rcParams['lines.linewidth']=lw
-    plt.rcParams['xtick.labelsize']=fs
-    plt.rcParams['ytick.labelsize']=fs
-    plt.rcParams['legend.fontsize']=.9*fs
-
-    fig, ax = plt.subplots(1, 1, figsize=(6,6))
-
-    hist, bins = np.histogram(estimated_num_events)
-    ax.stairs(hist, bins)
-
-    ax.axvline(Nevents, color='r')
-
-    ax.set_xlabel('Estimated number of events')
-    #ax.set_xlim(xmin=0,xmax=1)
-    ax.set_ylabel('N')
-    #ax.legend(loc='upper right')
-    ax.set_box_aspect(1)
-
-    filename = '/'.join(outfile.split('/')[:-1])+'/Nevents'+outfile.split('/')[-1]
-    plt.savefig(filename, bbox_inches='tight', dpi=1200)
-
-
-def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, outfile):
-    """
-    """
-    n_triangulations = len(selected_tris)
-
-    xgrid = np.linspace(-10,10,101)
-    ygrid = np.linspace(-10,10,101)
-    X, Y = np.meshgrid(xgrid, ygrid)
-    grid = np.c_[X.ravel(), Y.ravel()]
-    dx = xgrid[1] - xgrid[0]
-    dy = ygrid[1] - ygrid[0]
-
-    ## Inferred event rate ##
-    log10_dNdx = np.zeros((n_triangulations, xgrid.shape[0]))
-    log10_dNdy = np.zeros((n_triangulations, ygrid.shape[0]))
-    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
-    for ind, tri_ind in enumerate(tqdm(selected_tris)):
-        this_delo = delaunaytor.CPUDelaunayInterpolator()
-        this_delo.triangulate(triangulations[tri_ind])
-        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
-        log10_dNdx[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy)) / np.log(10)
-        log10_dNdy[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx)) / np.log(10)
 
     ## Prior rate ##
     log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
@@ -474,73 +171,30 @@ def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, out
         log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx)) / np.log(10)
 
     ## Compute `astro' marginals
-    astro_samples = astro_pop.rvs(100_000)
-    x_pdf_astro, _ = np.histogram(astro_samples[:, 0], bins=xgrid, density=True)
-    y_pdf_astro, _ = np.histogram(astro_samples[:, 1], bins=ygrid, density=True)
+    pdf = astro_pop.pdf(np.array([X,Y]).T)
+    x_pdf_astro = np.trapezoid(x=ygrid, y=pdf, axis=1)
+    y_pdf_astro = np.trapezoid(x=xgrid, y=pdf, axis=0)
     x_rate_astro = x_pdf_astro * Nevents
     y_rate_astro = y_pdf_astro * Nevents
 
-
-    #####################################
-    # Plotting parameters
-    fs = 12
-    lw = 1.4
-    plt.rcParams['font.size']=fs
-    plt.rcParams['font.family']='serif'
-    plt.rcParams['font.serif']='cmr10'
-    plt.rcParams['mathtext.fontset']='cm'
-    plt.rcParams['axes.unicode_minus']=False
-    plt.rcParams['axes.formatter.use_mathtext']=True
-    plt.rcParams['lines.linewidth']=lw
-    plt.rcParams['xtick.labelsize']=fs
-    plt.rcParams['ytick.labelsize']=fs
-    plt.rcParams['legend.fontsize']=.9*fs
-
-
-    x_labels = [r'x', r'y']
-    grids = [xgrid,ygrid]
-    y_labels = [r'$\mathrm{log}_{10}\mathrm{dN}/\mathrm{d}x$', 
-                r'$\mathrm{log}_{10}\mathrm{dN}/\mathrm{d}y$'
-                ]
     astro_rates = [x_rate_astro,y_rate_astro]
     prior_rates = [log10_dNdx_prior,log10_dNdy_prior]
-    for n,data in enumerate([log10_dNdx,log10_dNdy]):
+    prior_is_ok = True
+    for n,data in enumerate(prior_rates):
         low = np.quantile(data, 0.05, axis=0)
-        median = np.quantile(data, 0.5, axis=0)
         high = np.quantile(data, 0.95, axis=0)
+        if not (low <= np.log10((astro_rates[n]))).all():
+            print('WARNING: Astro rate over dimension %i is not always above the prior range'%n)
+            print('You might want to lower the range of weight distribution')
+            prior_is_ok = False
+        elif not (np.log10((astro_rates[n])) <= high).all():
+            print('WARNING: Astro rate over dimension %i is not always below the prior range'%n)
+            print('You might want to increase the range of weight distribution')
+            prior_is_ok = False
+        else:
+            print('\tAstro rate is well within the prior range in dimension %i' %n)
+    return prior_is_ok
 
-        low_prior = np.quantile(prior_rates[n], 0.05, axis=0)
-        median_prior = np.quantile(prior_rates[n], 0.5, axis=0)
-        high_prior = np.quantile(prior_rates[n], 0.95, axis=0)
-
-        fig, ax = plt.subplots(1, 1, figsize=(6,6))
-
-        mid_bins = (grids[n][:-1]+grids[n][1:]) /2
-        ax.plot(mid_bins, np.log10(astro_rates[n]), 
-                color="black", ls="--",
-                label=r"`Astro' pop",
-                )
-
-        ax.plot(grids[n], median, color="firebrick")
-        ax.fill_between(grids[n], low, high, 
-                        color="firebrick", alpha=0.5,
-                        label='Reconstructed',
-                        )
-
-        ax.plot(grids[n], median_prior, color="forestgreen", alpha=0.5)
-        ax.fill_between(grids[n], low_prior, high_prior,
-                        color="forestgreen", alpha=0.25,
-                        label='Prior',
-                        )
-
-        ax.set_xlabel(x_labels[n])
-        ax.set_xlim(xmin=-10,xmax=10)
-        ax.set_ylabel(y_labels[n])
-        ax.legend(loc='upper right')
-        ax.set_box_aspect(1)
-
-        filename = '/'.join(outfile.split('/')[:-1])+'/marginals%i'%(n+1)+outfile.split('/')[-1]
-        plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
 
@@ -552,7 +206,6 @@ def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, out
 if __name__ == "__main__":
 
     work_dir = './'
-    plot_dir = os.path.join(work_dir,'plots')
 
     # Define command line options
     parser = argparse.ArgumentParser()
@@ -579,8 +232,6 @@ if __name__ == "__main__":
     parser.add_argument("--temps", dest='ntemps', help="Number of temperatures", type=int, default=2)
     parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=2000)
     parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=1000)
-    # Show the plots
-    parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -610,8 +261,16 @@ if __name__ == "__main__":
     nleaves_max = {"tri": 40, "corners": 1}
 
     # Simulate injections
-    pdet = lambda events: p_det(events, sigma=args.sigma_det)
-    detected_injections, injection_priors = make_injections(args.Ninjections, samples, pdet=pdet)
+    filename = 'detected_injections.txt'
+    if os.path.exists(filename):
+        print('Loading injections from', filename)
+        detected_injections = np.loadtxt(filename, usecols=[0,1])
+        injection_priors = np.loadtxt(filename, usecols=2)
+    else:
+        print('Simulating injections')
+        pdet = lambda events: p_det(events, sigma=args.sigma_det)
+        detected_injections, injection_priors = make_injections(args.Ninjections, samples, pdet=pdet)
+        np.savetxt(filename, np.vstack([detected_injections.T, injection_priors]).T, header='last column is injection prior')
 
     # Set likelihood
     priors = set_uniform_priors(corners, ndims)
@@ -627,6 +286,30 @@ if __name__ == "__main__":
             num_injections=args.Ninjections,
             minus_infinity=-1e300,
             )
+
+    # Check that `astro' event rate is within priors
+    filename = 'prior_triangulations.txt'
+    astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
+    if not os.path.exists(filename):
+        print('Computing prior triangulations')
+        triangulations_prior = np.zeros((100, args.Nstart+corners.shape[0],ndims['tri']))
+        for t in trange(len(triangulations_prior)):
+            le_log = -np.inf
+            for _ in range(10_000):
+                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
+                                                          priors, ndims,
+                )
+                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
+                if le_log > -1e300:
+                    triangulations_prior[t] = np.vstack([init_proposal['tri'],np.c_[corners,init_proposal['corners'].T]])
+                    break
+        tosave = triangulations_prior.reshape(triangulations_prior.shape[0],triangulations_prior.shape[1]*triangulations_prior.shape[2])
+        np.savetxt(filename, tosave)
+    else:
+        print('Loading prior triangulations from', filename)
+        triangulations_prior = np.loadtxt(filename)
+        triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
+    prior_is_ok = check_prior_range(astro_pop, args.Nevents, triangulations_prior)
 
     # Actually start sampling
     filename = 'backend_events%i_samples%i' %(args.Nevents,args.Nsamples)
@@ -650,27 +333,6 @@ if __name__ == "__main__":
             else:
                 inds[branch][:, :, :] = True
             state = State(coords, inds=inds)
-
-        for t, w in product(range(args.ntemps), range(args.nwalkers)):
-            le_log = -np.inf
-            for _ in trange(10_000):
-                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
-                                                          priors, ndims,
-                )
-                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
-                if le_log > -1e300:
-                    break
-            else:
-                raise ValueError("Didn't work")
-            for branch in init_proposal:
-                coords[branch][t, w, : (args.Nstart if branch == "tri" else nleaves_max[branch])] = init_proposal[branch]
-
-        if args.show_plots:
-            # Plot initial delaunay
-            outfile = os.path.join(plot_dir, 'InitialDelaunayProposal_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
-            plot_delaunay(event_barycenters, init_proposal, corners,
-                          title=r'Initial Delaunay Proposal', outfile=outfile,
-                      )
 
         # Define moves for the sampling
         moves, rj_moves = define_moves(event_barycenters, nleaves_min, nleaves_max, priors)
@@ -719,46 +381,3 @@ if __name__ == "__main__":
             np.vstack([triangulations[ind],np.c_[corners, corner_weights[ind].T]])
             for ind in range(len(triangulations))
             ]
-    #selected_tris = np.random.choice(len(triangulations), size=args.nwalkers*args.nsteps, replace=False)
-    selected_tris = np.random.choice(len(triangulations), size=500, replace=False)
-        
-    if args.show_plots:
-        # Plot final delaunay of one walker
-        ind = 0
-        final_proposal = {"tri":last_sample.branches["tri"].coords[0, ind, last_sample.branches["tri"].inds[0, ind, :]]
-                          } | {
-                            "corners": last_sample.branches["corners"].coords[0, ind, 0]
-                            }
-
-        outfile = os.path.join(plot_dir, 'FinalDelaunayProposal_walker%i_events%i_samples%i.png' %(ind,args.Nevents,args.Nsamples))
-        plot_delaunay(event_barycenters, final_proposal, corners, 
-                      title=r'Final Delaunay Proposal - walker %i' %ind, outfile=outfile,
-                      )
-
-        # Plot some diagnostics of the sampling
-        outfile = os.path.join(plot_dir, '_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
-        plot_diagnostics(backend, outfile)
-
-        # Plot the estimated number of events
-        plot_Nevents(triangulations, Nevents=args.Nevents, outfile=outfile)
-        
-        # Plot the reconstructed pdf
-        plot_maps(triangulations, selected_tris, outfile=outfile)
-
-        # Plot the marginal distributions 
-        # Compare with `astro' pop and priors
-        astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-        triangulation_prior = np.zeros(1000, dtype=object)
-        for t in trange(len(triangulation_prior)):
-            le_log = -np.inf
-            for _ in range(10_000):
-                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
-                                                          priors, ndims,
-                )
-                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
-                if le_log > -1e300:
-                    triangulation_prior[t] = np.vstack([init_proposal['tri'],np.c_[corners,init_proposal['corners'].T]])
-                    break
-        plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulation_prior, Nevents=args.Nevents, outfile=outfile)
-
-        plt.show()
