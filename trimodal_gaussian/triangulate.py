@@ -340,7 +340,7 @@ def plot_diagnostics(backend, outfile):
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         corner_weights = np.array([chains["corners"][step, t, walker]
-                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
+                                   for step, walker in product(range(chains['corners'].shape[0]), range(backend.nwalkers))
                                    ]).ravel()
         hist, _ = np.histogram(corner_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
@@ -359,7 +359,7 @@ def plot_diagnostics(backend, outfile):
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         vertice_weights = np.concatenate([chains["tri"][step, t, walker][inds["tri"][step, t, walker]][:,-1]
-                                   for step, walker in product(range(args.nsteps), range(backend.nwalkers))
+                                   for step, walker in product(range(chains['corners'].shape[0]), range(backend.nwalkers))
                                    ])
         hist, _ = np.histogram(vertice_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
@@ -731,9 +731,6 @@ if __name__ == "__main__":
         moves, rj_moves = define_moves(event_barycenters, nleaves_min, nleaves_max, priors)
 
         print('Starting the sampling...')
-        nburn = args.nburn
-        nsteps = args.nsteps
-
         with Pool(4) as pool:
             ensemble = EnsembleSampler(
                 args.nwalkers,
