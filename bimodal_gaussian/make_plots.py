@@ -52,7 +52,7 @@ def plot_delaunay(event_barycenters, delaunay_proposal, corners,
                )
 
     cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
+    norm = mpl.colors.Normalize(vmin=-15,vmax=10)
 
     ax.scatter(
         vertices[:, 0], vertices[:, 1], 
@@ -159,7 +159,7 @@ def plot_diagnostics(backend, outfile):
 
     # Corner weights
     chains = backend.get_chain()
-    bins = np.linspace(-12,8,21)
+    bins = np.linspace(-15,10,26)
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         corner_weights = np.array([chains["corners"][step, t, walker]
@@ -167,8 +167,8 @@ def plot_diagnostics(backend, outfile):
                                    ]).ravel()
         hist, _ = np.histogram(corner_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-12, color='gray', linestyle='--')
-    ax.axvline(x=8, color='gray', linestyle='--')
+    ax.axvline(x=-15, color='gray', linestyle='--')
+    ax.axvline(x=10, color='gray', linestyle='--')
     ax.set_xlabel(r'Corner weights')
     ax.set_ylabel(r'')
     ax.legend(loc='best')
@@ -178,7 +178,7 @@ def plot_diagnostics(backend, outfile):
 
     # Vertices weights
     inds = backend.get_inds()
-    bins = np.linspace(-12,8,21)
+    bins = np.linspace(-15,10,26)
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
     for t in range(backend.ntemps):
         vertice_weights = np.concatenate([chains["tri"][step, t, walker][inds["tri"][step, t, walker]][:,-1]
@@ -186,8 +186,8 @@ def plot_diagnostics(backend, outfile):
                                    ])
         hist, _ = np.histogram(vertice_weights, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=-12, color='gray', linestyle='--')
-    ax.axvline(x=8, color='gray', linestyle='--')
+    ax.axvline(x=-15, color='gray', linestyle='--')
+    ax.axvline(x=10, color='gray', linestyle='--')
     ax.set_xlabel(r'Vertices weights')
     ax.set_ylabel(r'')
     ax.legend(loc='best')
@@ -218,7 +218,7 @@ def plot_maps(triangulations, selected_tris, outfile):
     plt.rcParams['legend.fontsize']=.9*fs
 
     cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-12,vmax=8)
+    norm = mpl.colors.Normalize(vmin=-15,vmax=10)
 
     xgrid = np.linspace(-10,10,101)
     ygrid = np.linspace(-10,10,101)
@@ -238,7 +238,7 @@ def plot_maps(triangulations, selected_tris, outfile):
     for q in quantiles:
         data = np.quantile(square_rate, q, axis=0)
         fig, ax = plt.subplots(1, 1, figsize=(6,6))
-        c = ax.pcolormesh(xgrid, ygrid, data[:-1, :-1], vmin=-12, vmax=8)
+        c = ax.pcolormesh(xgrid, ygrid, data[:-1, :-1], vmin=-15, vmax=10)
         cbar = fig.colorbar(c, ax=ax,
                             cmap=cmap, norm=norm,
                             fraction=0.086, pad=0.04, aspect=10,
@@ -500,11 +500,13 @@ if __name__ == "__main__":
             )
 
     # Check that `astro' event rate is within priors
-    filename = 'prior_triangulations.txt'
+    #filename = 'prior_triangulations.txt'
+    filename = 'prior_triangulations.npy'
     if os.path.exists(filename):
         print('Loading prior triangulations from', filename)
-        triangulations_prior = np.loadtxt(filename)
-        triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
+        #triangulations_prior = np.loadtxt(filename)
+        #triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
+        triangulations_prior = np.load(filename, allow_pickle=True)
     else:
         raise ValueError('File %s could not be found.' %filename)
 

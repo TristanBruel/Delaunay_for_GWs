@@ -93,10 +93,10 @@ def set_uniform_priors(corners, ndims):
                 1: uniform_dist(
                     corners[:, 1].min(), corners[:, 1].max()
                 ),
-                2: uniform_dist(-12, 8)
+                2: uniform_dist(-15, 10)
                 },
             "corners": {
-                d: uniform_dist(-12, 8) for d in range(ndims["corners"])
+                d: uniform_dist(-15, 10) for d in range(ndims["corners"])
                 }
             }
     return priors
@@ -161,12 +161,40 @@ def check_prior_range(astro_pop, Nevents, prior):
     dy = ygrid[1] - ygrid[0]
 
     ## Prior rate ##
-    log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
-    log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
+    d2N_prior = np.zeros((len(prior), xgrid.shape[0], ygrid.shape[0]))
     for ind in range(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
         log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
+        d2N_prior[ind] = np.exp(log_rate)
+
+    ## Compute `astro' rate
+    pdf = astro_pop.pdf(np.array([X,Y]).T)
+    rate_astro = pdf * Nevents
+
+    prior_is_ok = True
+    low = np.quantile(d2N_prior, 0.05, axis=0)
+    high = np.quantile(d2N_prior, 0.95, axis=0)
+    if not (low <= rate_astro).all():
+        print('WARNING: Astro rate is not always above the prior range.')
+        print('You might want to lower the range of weight distribution.')
+        prior_is_ok = False
+        if not (rate_astro <= high).all():
+            print('WARNING: Astro rate is not always below the prior range.')
+            print('You might want to increase the range of weight distribution.')
+            prior_is_ok = False
+    else:
+        print('Astro rate is well within the prior range.')
+    """
+    ## Prior rate ##
+    log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
+    log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
+    d2N_prior = np.zeros((len(prior), xgrid.shape[0], ygrid.shape[0]))
+    for ind in range(len(prior)):
+        this_delo = delaunaytor.CPUDelaunayInterpolator()
+        this_delo.triangulate(prior[ind])
+        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
+        #d2N_prior[ind] = np.exp(log_rate)
         log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy)) / np.log(10)
         log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx)) / np.log(10)
 
@@ -193,8 +221,8 @@ def check_prior_range(astro_pop, Nevents, prior):
             prior_is_ok = False
         else:
             print('\tAstro rate is well within the prior range in dimension %i' %n)
+    """
     return prior_is_ok
-
 
 
 
@@ -230,8 +258,8 @@ if __name__ == "__main__":
     # Sampling
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=4)
     parser.add_argument("--temps", dest='ntemps', help="Number of temperatures", type=int, default=2)
-    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=2000)
-    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=1000)
+    parser.add_argument("--burn", dest='nburn', help="Number of iterations to burn", type=int, default=10_000)
+    parser.add_argument("--steps", dest='nsteps', help="Number of iterations to run", type=int, default=5_000)
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -288,27 +316,32 @@ if __name__ == "__main__":
             )
 
     # Check that `astro' event rate is within priors
-    filename = 'prior_triangulations.txt'
-    astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
+    #filename = 'prior_triangulations.txt'
+    filename = 'prior_triangulations.npy'
     if not os.path.exists(filename):
         print('Computing prior triangulations')
-        triangulations_prior = np.zeros((100, args.Nstart+corners.shape[0],ndims['tri']))
+        #triangulations_prior = np.zeros((100, args.Nstart+corners.shape[0],ndims['tri']))
+        triangulations_prior = np.zeros(100, dtype='object')
         for t in trange(len(triangulations_prior)):
             le_log = -np.inf
+            Nstart = np.random.randint(nleaves_min['tri'], nleaves_max['tri'])
             for _ in range(10_000):
-                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
+                init_proposal = initial_delaunay_proposal(event_barycenters, corners, Nstart,
                                                           priors, ndims,
                 )
                 le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
                 if le_log > -1e300:
                     triangulations_prior[t] = np.vstack([init_proposal['tri'],np.c_[corners,init_proposal['corners'].T]])
                     break
-        tosave = triangulations_prior.reshape(triangulations_prior.shape[0],triangulations_prior.shape[1]*triangulations_prior.shape[2])
-        np.savetxt(filename, tosave)
+        #tosave = triangulations_prior.reshape(triangulations_prior.shape[0],triangulations_prior.shape[1]*triangulations_prior.shape[2])
+        #np.savetxt(filename, tosave)
+        np.save(filename, triangulations_prior)
     else:
         print('Loading prior triangulations from', filename)
-        triangulations_prior = np.loadtxt(filename)
-        triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
+        #triangulations_prior = np.loadtxt(filename)
+        #triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
+        triangulations_prior = np.load(filename, allow_pickle=True)
+    astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
     prior_is_ok = check_prior_range(astro_pop, args.Nevents, triangulations_prior)
 
     # Actually start sampling
