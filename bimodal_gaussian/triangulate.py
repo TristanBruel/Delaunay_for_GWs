@@ -185,16 +185,24 @@ def check_prior_range(astro_pop, Nevents, prior):
             prior_is_ok = False
     else:
         print('Astro rate is well within the prior range.')
+
+def check_prior_range_marginals(astro_pop, Nevents, prior):
     """
+    """
+    xgrid = np.linspace(-10,10,101)
+    ygrid = np.linspace(-10,10,101)
+    X, Y = np.meshgrid(xgrid, ygrid)
+    grid = np.c_[X.ravel(), Y.ravel()]
+    dx = xgrid[1] - xgrid[0]
+    dy = ygrid[1] - ygrid[0]
+
     ## Prior rate ##
     log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
     log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
-    d2N_prior = np.zeros((len(prior), xgrid.shape[0], ygrid.shape[0]))
     for ind in range(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
         log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
-        #d2N_prior[ind] = np.exp(log_rate)
         log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy)) / np.log(10)
         log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx)) / np.log(10)
 
@@ -221,7 +229,6 @@ def check_prior_range(astro_pop, Nevents, prior):
             prior_is_ok = False
         else:
             print('\tAstro rate is well within the prior range in dimension %i' %n)
-    """
     return prior_is_ok
 
 
