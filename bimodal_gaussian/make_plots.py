@@ -300,7 +300,7 @@ def plot_Nevents(triangulations, Nevents, outfile):
     hist, _ = np.histogram(estimated_num_events /Nevents, bins=bins)
     ax.stairs(hist, bins)
 
-    ax.axvline(Nevents, color='r')
+    ax.axvline(1, color='r')
 
     ax.set_xlabel('Estimated number of events /Real number of events')
     ax.set_xscale('log')
