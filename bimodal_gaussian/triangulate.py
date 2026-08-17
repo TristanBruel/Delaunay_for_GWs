@@ -186,6 +186,7 @@ def check_prior_range(astro_pop, Nevents, prior):
     else:
         print('Astro rate is well within the prior range.')
 
+
 def check_prior_range_marginals(astro_pop, Nevents, prior):
     """
     """
@@ -378,9 +379,6 @@ if __name__ == "__main__":
         moves, rj_moves = define_moves(event_barycenters, nleaves_min, nleaves_max, priors)
 
         print('Starting the sampling...')
-        nburn = args.nburn
-        nsteps = args.nsteps
-
         with Pool(4) as pool:
             ensemble = EnsembleSampler(
                 args.nwalkers,

@@ -436,18 +436,18 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Set 'astro' population
-    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,5,-2]))
+    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,4,-2]))
     parser.add_argument("--cov1", dest='cov1', help="Covariance matrix of first distribution", 
                         default=np.array([[5,2,0],[2,1,0],[0,0,1.5]]),
                         )
-    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,6]))
+    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,5]))
     parser.add_argument("--cov2", dest='cov2', help="Covariance matrix of second distribution", 
                         default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
                         )
     # Set detection probability
     parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=5)
     # Events and samples
-    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
+    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=2_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Show the plots
     parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
@@ -467,18 +467,18 @@ if __name__ == "__main__":
             outfile_events, outfile_samples,
             )
 
-    if args.show_plots:
-        # Plot astro pop
-        filename = 'pdf_pop' + args.plot3d*'_3D' + '.png'
-        outfile = os.path.join(plot_dir,filename)
-        fig_pop = plot_pdf(pop, args.plot3d, outfile)
-        # Plot detection probability
-        filename = 'pdet' + args.plot3d*'_3D' + '.png'
-        outfile = os.path.join(plot_dir,filename)
-        fig_pdet = plot_pdet(p_det, args.plot3d, outfile)
-        # Plot samples from observed events
-        filename = 'events%i_samples%i.png' %(args.Nevents,args.Nsamples)
-        outfile = os.path.join(plot_dir,filename)
-        fig_samples = plot_samples(observed_events, samples, outfile)
+    # Plot astro pop
+    filename = 'pdf_pop' + args.plot3d*'_3D' + '.png'
+    outfile = os.path.join(plot_dir,filename)
+    fig_pop = plot_pdf(pop, args.plot3d, outfile)
+    # Plot detection probability
+    filename = 'pdet' + args.plot3d*'_3D' + '.png'
+    outfile = os.path.join(plot_dir,filename)
+    fig_pdet = plot_pdet(p_det, args.plot3d, outfile)
+    # Plot samples from observed events
+    filename = 'events%i_samples%i.png' %(args.Nevents,args.Nsamples)
+    outfile = os.path.join(plot_dir,filename)
+    fig_samples = plot_samples(observed_events, samples, outfile)
 
+    if args.show_plots:
         plt.show()

@@ -274,10 +274,23 @@ def compute_num_events(triangulation_points):
 
 
 
-def plot_Nevents(triangulations, Nevents, outfile):
+def plot_Nevents(triangulations, selected_tris, Nevents, outfile):
     """
     """
-    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+    n_triangulations = len(selected_tris)
+    #estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+    estimated_num_events = np.zeros(n_triangulations)
+    xgrid = np.linspace(-10,10,101)
+    ygrid = np.linspace(-10,10,101)
+    X, Y = np.meshgrid(xgrid, ygrid)
+    grid = np.c_[X.ravel(), Y.ravel()]
+    dx = xgrid[1] - xgrid[0]
+    dy = ygrid[1] - ygrid[0]
+    for ind, tri_ind in enumerate(tqdm(selected_tris)):
+        this_delo = delaunaytor.CPUDelaunayInterpolator()
+        this_delo.triangulate(triangulations[tri_ind])
+        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
+        estimated_num_events[ind] = np.sum(np.exp(log_rate)) *dx *dy
 
     #####################################
     # Plotting parameters
@@ -575,7 +588,7 @@ if __name__ == "__main__":
     plot_diagnostics(backend, outfile)
 
     # Plot the estimated number of events
-    plot_Nevents(triangulations, Nevents=args.Nevents, outfile=outfile)
+    plot_Nevents(triangulations, selected_tris, Nevents=args.Nevents, outfile=outfile)
     
     # Plot the reconstructed pdf
     plot_maps(triangulations, selected_tris, outfile=outfile)

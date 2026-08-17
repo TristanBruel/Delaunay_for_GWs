@@ -103,10 +103,10 @@ def set_uniform_priors(corners, ndims):
                 2: uniform_dist(
                     corners[:, 1].min(), corners[:, 1].max()
                 ),
-                3: uniform_dist(-20, 10)
+                3: uniform_dist(-15, 5)
                 },
             "corners": {
-                d: uniform_dist(-20, 10) for d in range(ndims["corners"])
+                d: uniform_dist(-15, 5) for d in range(ndims["corners"])
                 }
             }
     return priors
@@ -119,7 +119,7 @@ def initial_delaunay_proposal(event_barycenters, corners, nstart,
     """
 
     test = make_valid_delaunay(event_barycenters, num_vertices=nstart, corners=corners)
-    init_proposal = {"tri": np.c_[test, priors["tri"][2].rvs(nstart)]
+    init_proposal = {"tri": np.c_[test, priors["tri"][3].rvs(nstart)]
                      } | {
                         branch: np.array(
                             [priors[branch][dim_indx].rvs() for dim_indx in range(ndims[branch])]).squeeze()
@@ -167,7 +167,7 @@ def check_prior_range(astro_pop, Nevents, prior):
     xgrid = np.linspace(-10,10,101)
     ygrid = np.linspace(-10,10,101)
     zgrid = np.linspace(-10,10,101)
-    X, Y = np.meshgrid(xgrid, ygrid, zgrid)
+    X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     grid = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
     dx = xgrid[1] - xgrid[0]
     dy = ygrid[1] - ygrid[0]
@@ -189,12 +189,14 @@ def check_prior_range(astro_pop, Nevents, prior):
     prior_is_ok = True
     low = np.quantile(d2N_prior, 0.05, axis=0)
     high = np.quantile(d2N_prior, 0.95, axis=0)
-    if not (low <= rate_astro).all():
-        print('WARNING: Astro rate is not always above the prior range.')
+    above = low <= rate_astro
+    below = rate_astro <= high
+    if not above.all():
+        print('WARNING: %.1f percent of the astro pdf is not above the 95 percent prior lower edge.' %((1-np.sum(pdf[above])*dx*dy*dz)*100))
         print('You might want to lower the range of weight distribution.')
         prior_is_ok = False
-        if not (rate_astro <= high).all():
-            print('WARNING: Astro rate is not always below the prior range.')
+        if not below.all():
+            print('WARNING: %.1f percent of the astro pdf is not below the 95 percent prior upper edge.' %((1-np.sum(pdf[below])*dx*dy*dz)*100))
             print('You might want to increase the range of weight distribution.')
             prior_is_ok = False
     else:
@@ -215,21 +217,21 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Set 'astro' population
-    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,5,-2]))
+    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,4,-2]))
     parser.add_argument("--cov1", dest='cov1', help="Covariance matrix of first distribution",
                         default=np.array([[5,2,0],[2,1,0],[0,0,1.5]]),
                         )
-    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,6]))
+    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,5]))
     parser.add_argument("--cov2", dest='cov2', help="Covariance matrix of second distribution",
                         default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
                         )
     # Set detection probability
     parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=5)
     # Events and samples
-    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
+    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=2_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Injections
-    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=10_000_000)
+    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=20_000_000)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=9)
     # Sampling
@@ -262,6 +264,8 @@ if __name__ == "__main__":
                         [-10,10,-10],[10,10,-10],
                         [-10,-10,10],[10,-10,10],
                         [-10,10,10],[10,10,10]])
+    if samples.max()>corners.max() or samples.min()<corners.min():
+        raise ValueError('Some samples are outside the box.')
     # Some properties of the delaunay sampling scheme
     branch_names = ["tri", "corners"]
     ndims = {"tri": 4, "corners": 8}
@@ -272,8 +276,8 @@ if __name__ == "__main__":
     filename = 'detected_injections.txt'
     if os.path.exists(filename):
         print('Loading injections from', filename)
-        detected_injections = np.loadtxt(filename, usecols=[0,1])
-        injection_priors = np.loadtxt(filename, usecols=2)
+        detected_injections = np.loadtxt(filename, usecols=[0,1,2])
+        injection_priors = np.loadtxt(filename, usecols=3)
     else:
         print('Simulating injections')
         pdet = lambda events: p_det(events, sigma=args.sigma_det)
@@ -340,27 +344,6 @@ if __name__ == "__main__":
             else:
                 inds[branch][:, :, :] = True
             state = State(coords, inds=inds)
-
-        for t, w in product(range(args.ntemps), range(args.nwalkers)):
-            le_log = -np.inf
-            for _ in trange(10_000):
-                init_proposal = initial_delaunay_proposal(event_barycenters, corners, args.Nstart,
-                                                          priors, ndims,
-                )
-                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
-                if le_log > -1e300:
-                    break
-            else:
-                raise ValueError("Didn't work")
-            for branch in init_proposal:
-                coords[branch][t, w, : (args.Nstart if branch == "tri" else nleaves_max[branch])] = init_proposal[branch]
-
-        if args.show_plots:
-            # Plot initial delaunay
-            outfile = os.path.join(plot_dir, 'InitialDelaunayProposal_events%i_samples%i.png' %(args.Nevents,args.Nsamples))
-            plot_delaunay(event_barycenters, init_proposal, corners,
-                          title=r'Initial Delaunay Proposal', outfile=outfile,
-                          )
 
         # Define moves for the sampling
         moves, rj_moves = define_moves(event_barycenters, nleaves_min, nleaves_max, priors)

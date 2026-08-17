@@ -8,7 +8,7 @@ from scipy import stats, special
 from scipy.spatial import Delaunay
 from local_utils import delaunaytor
 from generate_events import generate_pop, p_det
-from triangulate import set_uniform_priors, SquareLogLikelihood, make_injections, initial_delaunay_proposal
+from triangulate import set_uniform_priors, SquareLogLikelihood, initial_delaunay_proposal
 
 import os
 import argparse
@@ -63,7 +63,7 @@ def plot_delaunay(event_barycenters, delaunay_proposal, corners,
     plt.rcParams['legend.fontsize']=.9*fs
 
     cmap = plt.get_cmap('magma')
-    norm = mpl.colors.Normalize(vmin=-10,vmax=20)
+    norm = mpl.colors.Normalize(vmin=-20,vmax=10)
 
     fig = plt.figure(figsize=(6,6))
     ax = plt.axes(projection='3d')
@@ -302,10 +302,25 @@ def compute_num_events(triangulation_points):
 
 
 
-def plot_Nevents(triangulations, Nevents, outfile):
+def plot_Nevents(triangulations, selected_tris, Nevents, outfile):
     """
     """
-    estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+    n_triangulations = len(selected_tris)
+    #estimated_num_events = np.array([compute_num_events(tri) for tri in triangulations])
+    estimated_num_events = np.zeros(n_triangulations)
+    xgrid = np.linspace(-10,10,101)
+    ygrid = np.linspace(-10,10,101)
+    zgrid = np.linspace(-10,10,101)
+    X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
+    grid = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
+    dx = xgrid[1] - xgrid[0]
+    dy = ygrid[1] - ygrid[0]
+    dz = zgrid[1] - zgrid[0]
+    for ind, tri_ind in enumerate(tqdm(selected_tris)):
+        this_delo = delaunaytor.CPUDelaunayInterpolator()
+        this_delo.triangulate(triangulations[tri_ind])
+        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0], zgrid.shape[0])
+        estimated_num_events[ind] = np.sum(np.exp(log_rate)) *dx *dy *dz
 
     #####################################
     # Plotting parameters
@@ -327,10 +342,10 @@ def plot_Nevents(triangulations, Nevents, outfile):
     hist, bins = np.histogram(estimated_num_events)
     ax.stairs(hist, bins)
 
-    ax.axvline(1, color='r')
+    ax.axvline(Nevents, color='r')
 
     ax.set_xlabel('Estimated number of events')
-    ax.st_xscale('log')
+    ax.set_xscale('log')
     #ax.set_xlim(xmin=1e-2,xmax=1e2)
     ax.set_ylabel('N')
     ax.set_box_aspect(1)
@@ -369,14 +384,14 @@ def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, out
     ## Prior rate ##
     log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
     log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
-    log10_dNdz_prior = np.zeros((len(prior), ygrid.shape[0]))
+    log10_dNdz_prior = np.zeros((len(prior), zgrid.shape[0]))
     for ind in range(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
         log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0], zgrid.shape[0])
-        log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy) + np.log(dz)) / np.log(10)
-        log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx) + np.log(dz)) / np.log(10)
-        log10_dNdz_prior[ind] = (special.logsumexp(log_rate, axis=2) + np.log(dx) + np.log(dy)) / np.log(10)
+        log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=(0,2)) + np.log(dy) + np.log(dz)) / np.log(10)
+        log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=(1,2)) + np.log(dx) + np.log(dz)) / np.log(10)
+        log10_dNdz_prior[ind] = (special.logsumexp(log_rate, axis=(0,1)) + np.log(dx) + np.log(dy)) / np.log(10)
 
     ## Compute `astro' marginals
     astro_samples = astro_pop.rvs(100_000)
@@ -410,37 +425,31 @@ def plot_marginals(triangulations, selected_tris, astro_pop, prior, Nevents, out
                 '$\\rm{log}_{10}\\rm{dN}/\\rm{d}y$',
                 '$\\rm{log}_{10}\\rm{dN}/\\rm{d}z$'
                 ]
-    prior_rates = [log10_dNdx_prior,log10_dNdy_prior]
+    prior_rates = [log10_dNdx_prior,log10_dNdy_prior,log10_dNdz_prior]
     astro_rates = [x_rate_astro,y_rate_astro,z_rate_astro]
     for n,data in enumerate([log10_dNdx,log10_dNdy,log10_dNdz]):
         low = np.quantile(data, 0.05, axis=0)
         median = np.quantile(data, 0.5, axis=0)
         high = np.quantile(data, 0.95, axis=0)
-
         low_prior = np.quantile(prior_rates[n], 0.05, axis=0)
         median_prior = np.quantile(prior_rates[n], 0.5, axis=0)
         high_prior = np.quantile(prior_rates[n], 0.95, axis=0)
-
         fig, ax = plt.subplots(1, 1, figsize=(6,6))
-
         mid_bins = (grids[n][:-1]+grids[n][1:]) /2
         ax.plot(mid_bins, np.log10(astro_rates[n]), 
                 color="black", ls="--",
                 label=r"`Astro' pop",
                 )
-
-        ax.plot(grids[n], median, color="firebrick")
-        ax.fill_between(grids[n], low, high, 
-                        color="firebrick", alpha=0.5,
-                        label='Reconstructed',
-                        )
-
+        #ax.plot(grids[n], median, color="firebrick")
+        #ax.fill_between(grids[n], low, high, 
+        #                color="firebrick", alpha=0.5,
+        #                label='Reconstructed',
+        #                )
         ax.plot(grids[n], median_prior, color="forestgreen", alpha=0.5)
         ax.fill_between(grids[n], low_prior, high_prior,
                         color="forestgreen", alpha=0.25,
                         label='Prior',
                         )
-
         ax.set_xlabel(x_labels[n])
         ax.set_xlim(xmin=-10, xmax=10)
         ax.set_ylabel(y_labels[n])
@@ -479,7 +488,7 @@ if __name__ == "__main__":
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Injections
-    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=1_000_000)
+    parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=10_000_000)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=9)
     # Sampling
@@ -521,11 +530,16 @@ if __name__ == "__main__":
     nleaves_max = {"tri": 100, "corners": 1}
 
     # Simulate injections
-    pdet = lambda events: p_det(events, sigma=args.sigma_det)
-    detected_injections, injection_priors = make_injections(args.Ninjections, samples, pdet=pdet)
+    filename = 'detected_injections.txt'
+    if os.path.exists(filename):
+        print('Loading injections from', filename)
+        detected_injections = np.loadtxt(filename, usecols=[0,1,2])
+        injection_priors = np.loadtxt(filename, usecols=2)
+    else:
+        raise ValueError('File %s could not be found.' %filename)
 
     # Set likelihood
-    priors = set_uniform_priors(corners, ndims)
+    priors = set_uniform_priors(corners, ndims, weight_min=-80, weight_max=0)
     event_logpriors = np.ones(samples.shape[0])
     log_like_fn = SquareLogLikelihood(
             corners=corners,
@@ -590,7 +604,7 @@ if __name__ == "__main__":
             np.vstack([triangulations[ind],np.c_[corners, corner_weights[ind].T]])
             for ind in range(len(triangulations))
             ]
-    selected_tris = np.random.choice(len(triangulations), size=500, replace=False)
+    selected_tris = np.random.choice(len(triangulations), size=100, replace=False)
 
     # Plot final delaunay of one walker
     ind = 0
@@ -609,14 +623,14 @@ if __name__ == "__main__":
     plot_diagnostics(backend, outfile)
 
     # Plot the estimated number of events
-    plot_Nevents(triangulations, Nevents=args.Nevents, outfile=outfile)
+    plot_Nevents(triangulations, selected_tris, Nevents=args.Nevents, outfile=outfile)
     
     # Plot the reconstructed pdf
     #plot_maps(triangulations, selected_tris, outfile=outfile)
 
     # Plot the marginal distributions and compare with `astro' pop
     astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-    plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulation_prior, Nevents=args.Nevents, outfile=outfile)
+    plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulation_priors, Nevents=args.Nevents, outfile=outfile)
 
     if args.show_plots:
         plt.show()
