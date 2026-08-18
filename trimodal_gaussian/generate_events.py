@@ -447,7 +447,7 @@ if __name__ == "__main__":
     # Set detection probability
     parser.add_argument("--sigma", dest='sigma_det', help="Exponential parameter of the detection probability", type=float, default=5)
     # Events and samples
-    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=2_000)
+    parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Show the plots
     parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
