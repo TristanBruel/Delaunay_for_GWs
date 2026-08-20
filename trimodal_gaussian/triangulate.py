@@ -191,7 +191,7 @@ if __name__ == "__main__":
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=9)
     # Prior range
-    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-40)
+    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-50)
     parser.add_argument("--wmax", dest='wmax', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=4)
@@ -238,7 +238,7 @@ if __name__ == "__main__":
         detected_injections = np.loadtxt(filename, usecols=[0,1,2])
         injection_priors = np.loadtxt(filename, usecols=3)
     else:
-        print('Simulating injections')
+        print('Simulating injections...')
         pdet = lambda events: p_det(events, sigma=args.sigma_det)
         detected_injections, injection_priors = make_injections(args.Ninjections, samples, pdet=pdet)
         np.savetxt(filename, np.vstack([detected_injections.T, injection_priors]).T, header='last column is injection prior')

@@ -128,13 +128,15 @@ def plot_pdf(pop, plot3d=False, outfile=None):
 
     cmap = plt.get_cmap('viridis')
 
-    xgrid = np.linspace(-10,10,21)
+    xgrid = np.linspace(-10,10,20)
     ygrid = np.linspace(-10,10,21)
-    zgrid = np.linspace(-10,10,21)
+    zgrid = np.linspace(-10,10,22)
     X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     pdf = pop.pdf(np.array([X.flatten(),Y.flatten(),Z.flatten()]).T)
     pdf = pdf.reshape(X.shape)
     norm = mpl.colors.Normalize(vmin=0,vmax=pdf.max())
+    #pdf = np.log(pdf)
+    #norm = mpl.colors.Normalize(vmin=-30, vmax=pdf.max())
 
     if plot3d:
         fig = plt.figure(figsize=(6,6))
@@ -161,7 +163,7 @@ def plot_pdf(pop, plot3d=False, outfile=None):
         cbar.ax.tick_params(labelsize=0.8*fs)
 
     else:
-        fig, axes = plt.subplots(1, 3, figsize=(14,4))
+        fig, axes = plt.subplots(1, 3, figsize=(16,4))
 
         ax=axes[0]
         X, Y = np.meshgrid(xgrid, ygrid)
@@ -175,9 +177,10 @@ def plot_pdf(pop, plot3d=False, outfile=None):
         ax.set_xlim(-10,10)
         ax.set_ylabel(r'y')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         ax=axes[1]
-        Z, Y = np.meshgrid(zgrid,ygrid)
+        Z, Y = np.meshgrid(zgrid, ygrid)
         data = np.trapezoid(x=xgrid, y=pdf, axis=1)
         ax.contourf(Z, Y, data,
                     cmap=cmap,
@@ -188,27 +191,30 @@ def plot_pdf(pop, plot3d=False, outfile=None):
         ax.set_xlim(-10,10)
         ax.set_ylabel(r'y')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         ax=axes[2]
         data = np.trapezoid(x=ygrid, y=pdf, axis=0)
-        X, Z = np.meshgrid(xgrid, zgrid)
-        ax.contourf(X, Z, data.T,
+        Z, X = np.meshgrid(zgrid, xgrid)
+        ax.contourf(Z, X, data,
                     cmap=cmap,
                     levels=100,
                    )
-        ax.contour(X, Z, data.T, colors='k')
+        ax.contour(Z, X, data, colors='k')
 
-        ax.set_xlabel(r'x')
+        ax.set_xlabel(r'z')
         ax.set_xlim(-10,10)
-        ax.set_ylabel(r'z')
+        ax.set_ylabel(r'x')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         axes[1].set_title("`Astro' Population")
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         cbar = fig.colorbar(sm, ax=axes,
-                            fraction=0.086, pad=0.04, aspect=10,
+                            fraction=0.086, pad=0.02, aspect=10,
                             )
         cbar.set_label(r'pdf')
+        #cbar.set_label(r'log pdf')
         cbar.ax.tick_params(labelsize=0.8*fs)
 
 
@@ -243,9 +249,9 @@ def plot_pdet(p_det, plot3d=False, outfile=None):
 
     cmap = plt.get_cmap('viridis')
 
-    xgrid = np.linspace(-10,10,21)
+    xgrid = np.linspace(-10,10,20)
     ygrid = np.linspace(-10,10,21)
-    zgrid = np.linspace(-10,10,21)
+    zgrid = np.linspace(-10,10,22)
     X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
     pdet = p_det(np.array([X.flatten(),Y.flatten(),Z.flatten()]).T)
     pdet = pdet.reshape(X.shape)
@@ -278,7 +284,8 @@ def plot_pdet(p_det, plot3d=False, outfile=None):
         cbar.ax.tick_params(labelsize=0.8*fs)
 
     else:
-        fig, axes = plt.subplots(1, 3, figsize=(14,4))
+        fig, axes = plt.subplots(1, 3, figsize=(16,4))
+
         ax=axes[0]
         X, Y = np.meshgrid(xgrid, ygrid)
         data = np.trapezoid(x=zgrid, y=pdet, axis=2)
@@ -291,9 +298,10 @@ def plot_pdet(p_det, plot3d=False, outfile=None):
         ax.set_xlim(-10,10)
         ax.set_ylabel(r'y')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         ax=axes[1]
-        Z, Y = np.meshgrid(zgrid,ygrid)
+        Z, Y = np.meshgrid(zgrid, ygrid)
         data = np.trapezoid(x=xgrid, y=pdet, axis=1)
         ax.contourf(Z, Y, data,
                     cmap=cmap,
@@ -304,25 +312,27 @@ def plot_pdet(p_det, plot3d=False, outfile=None):
         ax.set_xlim(-10,10)
         ax.set_ylabel(r'y')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         ax=axes[2]
         data = np.trapezoid(x=ygrid, y=pdet, axis=0)
-        X, Z = np.meshgrid(xgrid, zgrid)
-        ax.contourf(X, Z, data.T,
+        Z, X = np.meshgrid(zgrid, xgrid)
+        ax.contourf(Z, X, data,
                     cmap=cmap,
                     levels=100,
                    )
-        ax.contour(X, Z, data.T, colors='k')
+        ax.contour(Z, X, data, colors='k')
 
-        ax.set_xlabel(r'x')
+        ax.set_xlabel(r'z')
         ax.set_xlim(-10,10)
-        ax.set_ylabel(r'z')
+        ax.set_ylabel(r'x')
         ax.set_ylim(-10,10)
+        ax.set_box_aspect(1)
 
         axes[1].set_title('Detection probability')
         sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
         cbar = fig.colorbar(sm, ax=axes,
-                            fraction=0.086, pad=0.04, aspect=10,
+                            fraction=0.086, pad=0.02, aspect=10,
                             )
         cbar.set_label(r'pdet')
         cbar.ax.tick_params(labelsize=0.8*fs)
@@ -357,7 +367,7 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples
         print('Loading samples from:', outfile_samples)
         samples = np.loadtxt(outfile_samples)
     else:
-        print('Generating samples.')
+        print('Generating samples...')
         events = pop.rvs(size=Nevents)
         observed_events = events[np.random.random(events.shape[0]) < p_det(events)]
         np.savetxt(outfile_events, observed_events)

@@ -29,7 +29,7 @@ def make_delaunay(num_vertices, corners):
 
 
 
-def make_some_checks(astro_pop, prior, Nevents):
+def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
     """
     """
     #####################################
@@ -59,6 +59,7 @@ def make_some_checks(astro_pop, prior, Nevents):
 
     ## Prior rate ##
     d2N_prior = np.zeros((len(prior), ygrid.shape[0], xgrid.shape[0], zgrid.shape[0]))
+    print('Computing prior rates over a grid...')
     for ind in trange(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
@@ -80,6 +81,9 @@ def make_some_checks(astro_pop, prior, Nevents):
     #ax.set_xlim(xmin=1e-2,xmax=1e2)
     ax.set_ylabel('N')
     ax.set_box_aspect(1)
+
+    filename = os.path.join(plot_dir, 'prior_Nevents.png')
+    plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
     
     ## Plot marginal distributions ##
@@ -110,11 +114,11 @@ def make_some_checks(astro_pop, prior, Nevents):
         print('Astro rate is well within the prior range.')
     """
 
-    x_labels = [r'x', r'y', r'z']
+    x_labels = [r'$x$', r'$y$', r'$z$']
     grids = [xgrid,ygrid,zgrid]
-    y_labels = ['$\\rm{log}_{10}\\rm{dN}/\\rm{d}x$', 
-                '$\\rm{log}_{10}\\rm{dN}/\\rm{d}y$',
-                '$\\rm{log}_{10}\\rm{dN}/\\rm{d}z$'
+    y_labels = [r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}x)$', 
+                r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}y)$',
+                r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}z)$',
                 ]
     prior_rates = [log10_dNdx_prior,log10_dNdy_prior,log10_dNdz_prior]
     astro_rates = [x_rate_astro,y_rate_astro,z_rate_astro]
@@ -137,6 +141,9 @@ def make_some_checks(astro_pop, prior, Nevents):
         ax.set_ylabel(y_labels[n])
         ax.legend(loc='best')
         ax.set_box_aspect(1)
+
+        filename = os.path.join(plot_dir, 'prior_dNd%s.png' %(['x','y','z'][n]))
+        plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
 
@@ -164,8 +171,10 @@ if __name__ == "__main__":
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     # Prior range
-    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-40)
+    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-50)
     parser.add_argument("--wmax", dest='wmax', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
+    # Show the plots
+    parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
     args = parser.parse_args()
 
 
@@ -201,5 +210,6 @@ if __name__ == "__main__":
         triangulations_prior = np.load(filename, allow_pickle=True)
 
     astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-    make_some_checks(astro_pop=astro_pop, prior=triangulations_prior, Nevents=args.Nevents)
-    plt.show()
+    make_some_checks(astro_pop=astro_pop, prior=triangulations_prior, Nevents=args.Nevents, plot_dir=plot_dir)
+    if args.show_plots:
+        plt.show()
