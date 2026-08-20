@@ -181,7 +181,7 @@ if __name__ == "__main__":
 
     # Load triangulations from prior
     priors = set_uniform_priors(corners, ndims, weight_min=args.wmin, weight_max=args.wmax)
-    filename = 'prior_triangulations_wmin%i_wmax%i.npy' %(args.wmin,args.wmax)
+    filename = 'prior_triangulations.npy'
     if not os.path.exists(filename):
         print('Computing prior triangulations')
         triangulations_prior = np.zeros(100, dtype='object')

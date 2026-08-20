@@ -630,7 +630,7 @@ if __name__ == "__main__":
 
     # Plot the marginal distributions and compare with `astro' pop
     astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-    plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulation_priors, Nevents=args.Nevents, outfile=outfile)
+    plot_marginals(triangulations, selected_tris, astro_pop=astro_pop, prior=triangulations_prior, Nevents=args.Nevents, outfile=outfile)
 
     if args.show_plots:
         plt.show()
