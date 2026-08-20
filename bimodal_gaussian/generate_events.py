@@ -268,15 +268,15 @@ def sample_events(pop, Nevents, Nsamples, p_det, outfile_events, outfile_samples
         shifted = observed_events + distro_errors.rvs(size=observed_events.shape[0])
         samples = np.repeat(shifted, Nsamples, axis=0) + distro_errors.rvs(size=shifted.shape[0]*Nsamples)
         np.savetxt(outfile_samples, samples)
-
     print('Number of detected events:', len(observed_events))
     return observed_events, samples
 
 
-def plot_samples(observed_events, samples, Nsamples, outfile):
+def plot_samples(observed_events, samples, outfile):
     """
     Plot events.
     """
+    Nsamples = int(samples.shape[0] /observed_events.shape[0])
     event_limits = np.arange(0,len(samples),Nsamples)
     event_barycenters = (
             np.add.reduceat(samples, event_limits, axis=0) /Nsamples
@@ -380,6 +380,6 @@ if __name__ == "__main__":
         # Plot samples from observed events
         filename = 'events%i_samples%i.png' %(args.Nevents,args.Nsamples)
         outfile = os.path.join(plot_dir,filename)
-        fig_samples = plot_samples(observed_events, samples, args.Nsamples, outfile)
+        fig_samples = plot_samples(observed_events, samples, outfile)
 
         plt.show()

@@ -17,15 +17,14 @@ from tqdm import trange, tqdm
 def make_delaunay(num_vertices, corners):
     """
     """
+    num_corners = len(corners)
     min_max_x = [np.min(corners[:, 0]), np.max(corners[:, 0])]
     min_max_y = [np.min(corners[:, 1]), np.max(corners[:, 1])]
-    min_max_z = [np.min(corners[:, 2]), np.max(corners[:, 2])]
-    vertices = np.zeros((num_vertices + 8, 3))
-    vertices[:8] = corners
-    vertices[8:, 0] = np.random.uniform(*min_max_x, size=num_vertices)
-    vertices[8:, 1] = np.random.uniform(*min_max_y, size=num_vertices)
-    vertices[8:, 2] = np.random.uniform(*min_max_z, size=num_vertices)
-    return vertices[8:]
+    vertices = np.zeros((num_vertices + num_corners, 2))
+    vertices[:num_corners] = corners
+    vertices[num_corners:, 0] = np.random.uniform(*min_max_x, size=num_vertices)
+    vertices[num_corners:, 1] = np.random.uniform(*min_max_y, size=num_vertices)
+    return vertices[num_corners:]
 
 
 
@@ -48,24 +47,22 @@ def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
     plt.rcParams['legend.fontsize']=.9*fs
 
 
-    xgrid = np.linspace(-10,10,101)
+    xgrid = np.linspace(-10,10,100)
     ygrid = np.linspace(-10,10,101)
-    zgrid = np.linspace(-10,10,101)
-    X, Y, Z = np.meshgrid(xgrid, ygrid, zgrid)
-    grid = np.c_[X.ravel(), Y.ravel(), Z.ravel()]
+    X, Y = np.meshgrid(xgrid, ygrid)
+    grid = np.c_[X.ravel(), Y.ravel()]
     dx = xgrid[1] - xgrid[0]
     dy = ygrid[1] - ygrid[0]
-    dz = zgrid[1] - zgrid[0]
 
     ## Prior rate ##
-    d2N_prior = np.zeros((len(prior), ygrid.shape[0], xgrid.shape[0], zgrid.shape[0]))
+    d2N_prior = np.zeros((len(prior), xgrid.shape[0], ygrid.shape[0]))
     print('Computing prior rates over a grid...')
     for ind in trange(len(prior)):
         this_delo = delaunaytor.CPUDelaunayInterpolator()
         this_delo.triangulate(prior[ind])
-        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0], zgrid.shape[0])
+        log_rate = this_delo.interpolate(grid).reshape(xgrid.shape[0], ygrid.shape[0])
         d2N_prior[ind] = np.exp(log_rate)
-    estimated_num_events = np.sum(d2N_prior, axis=(1,2,3)) *dx *dy *dz
+    estimated_num_events = np.sum(d2N_prior, axis=(1,2)) *dx *dy
     
     ## Plot number of events from prior triangulations ##
     fig, ax = plt.subplots(1, 1, figsize=(6,6))
@@ -75,7 +72,6 @@ def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
               color="forestgreen", alpha=0.25,
               )
     ax.axvline(Nevents, color='r')
-
     ax.set_xlabel('Estimated number of events')
     ax.set_xscale('log')
     #ax.set_xlim(xmin=1e-2,xmax=1e2)
@@ -87,17 +83,15 @@ def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
 
     
     ## Plot marginal distributions ##
-    log10_dNdx_prior = np.log10(np.sum(d2N_prior, axis=(1,3)) *dy*dz)
-    log10_dNdy_prior = np.log10(np.sum(d2N_prior, axis=(2,3)) *dx*dz)
-    log10_dNdz_prior = np.log10(np.sum(d2N_prior, axis=(1,2)) *dx*dz)
+    log10_dNdx_prior = np.log10(np.sum(d2N_prior, axis=2) *dy)
+    log10_dNdy_prior = np.log10(np.sum(d2N_prior, axis=1) *dx)
 
     ## Compute `astro' rate
     pdf = astro_pop.pdf(grid)
     pdf = pdf.reshape(X.shape)
     rate_astro = pdf * Nevents
-    x_rate_astro = np.sum(rate_astro, axis=(0,2)) *dy*dz
-    y_rate_astro = np.sum(rate_astro, axis=(1,2)) *dx*dz
-    z_rate_astro = np.sum(rate_astro, axis=(0,1)) *dx*dy
+    x_rate_astro = np.sum(rate_astro, axis=0) *dy
+    y_rate_astro = np.sum(rate_astro, axis=1) *dx
 
     """
     low = np.quantile(d2N_prior, 0.05, axis=0)
@@ -114,14 +108,13 @@ def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
         print('Astro rate is well within the prior range.')
     """
 
-    x_labels = [r'$x$', r'$y$', r'$z$']
-    grids = [xgrid,ygrid,zgrid]
+    x_labels = [r'$x$', r'$y$']
+    grids = [xgrid,ygrid]
     y_labels = [r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}x)$', 
                 r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}y)$',
-                r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}z)$',
                 ]
-    prior_rates = [log10_dNdx_prior,log10_dNdy_prior,log10_dNdz_prior]
-    astro_rates = [x_rate_astro,y_rate_astro,z_rate_astro]
+    prior_rates = [log10_dNdx_prior,log10_dNdy_prior]
+    astro_rates = [x_rate_astro,y_rate_astro]
     for n in range(len(prior_rates)):
         low_prior = np.quantile(prior_rates[n], 0.05, axis=0)
         median_prior = np.quantile(prior_rates[n], 0.5, axis=0)
@@ -142,7 +135,7 @@ def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
         ax.legend(loc='best')
         ax.set_box_aspect(1)
 
-        filename = os.path.join(plot_dir, 'prior_dNd%s.png' %(['x','y','z'][n]))
+        filename = os.path.join(plot_dir, 'prior_dNd%s.png' %(['x','y'][n]))
         plt.savefig(filename, bbox_inches='tight', dpi=1200)
 
 
@@ -160,33 +153,30 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Set 'astro' population
-    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([3,5,-2]))
+    parser.add_argument("--mu1", dest='mu1', help="Mean of first distribution", default=np.array([-5,0]))
     parser.add_argument("--cov1", dest='cov1', help="Covariance matrix of first distribution",
-                        default=np.array([[5,2,0],[2,1,0],[0,0,1.5]]),
+                        default=np.array([[3,1],[1,3]]),
                         )
-    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([-4.,2,6]))
+    parser.add_argument("--mu2", dest='mu2', help="Mean of second distribution", default=np.array([5,0]))
     parser.add_argument("--cov2", dest='cov2', help="Covariance matrix of second distribution",
-                        default=np.array([[1.7,0,2],[0,2.2,0],[2,0,3.5]]),
+                        default=np.array([[2,-1],[-1,1]]),
                         )
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
     # Prior range
-    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-50)
+    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-30)
     parser.add_argument("--wmax", dest='wmax', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Show the plots
     parser.add_argument("-p", dest='show_plots', action='store_true', help="Show plots")
     args = parser.parse_args()
 
 
-    corners = np.array([[-10,-10,-10,],[10,-10,-10],
-                        [-10,10,-10],[10,10,-10],
-                        [-10,-10,10],[10,-10,10],
-                        [-10,10,10],[10,10,10]])
+    corners = np.array([[-10,-10],[-10,10],[10,-10],[10,10]])
     # Some properties of the delaunay sampling scheme
     branch_names = ["tri", "corners"]
-    ndims = {"tri": 4, "corners": 8}
-    nleaves_min = {"tri": 8, "corners": 1}
-    nleaves_max = {"tri": 100, "corners": 1}
+    ndims = {"tri": 3, "corners": 4}
+    nleaves_min = {"tri": 4, "corners": 1}
+    nleaves_max = {"tri": 40, "corners": 1}
 
     # Load triangulations from prior
     priors = set_uniform_priors(corners, ndims, weight_min=args.wmin, weight_max=args.wmax)
@@ -197,7 +187,7 @@ if __name__ == "__main__":
         for t in trange(len(triangulations_prior)):
             Nstart = np.random.randint(nleaves_min['tri'], nleaves_max['tri'])
             test = make_delaunay(num_vertices=Nstart, corners=corners)
-            init_proposal = {"tri": np.c_[test, priors["tri"][3].rvs(Nstart)]
+            init_proposal = {"tri": np.c_[test, priors["tri"][2].rvs(Nstart)]
                      } | {
                         branch: np.array(
                             [priors[branch][dim_indx].rvs() for dim_indx in range(ndims[branch])]).squeeze()

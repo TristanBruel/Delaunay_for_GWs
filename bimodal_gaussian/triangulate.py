@@ -56,18 +56,19 @@ def make_injections(Ninjections, observed_events, pdet):
 def make_valid_delaunay(points, num_vertices, corners):
     """
     """
+    num_corners = len(corners)
     if num_vertices > 3 + points.shape[0]:
         raise ValueError("That number of vertices breaks geometry")
     min_max_x = [np.min(points[:, 0]), np.max(points[:, 0])]
     min_max_y = [np.min(points[:, 1]), np.max(points[:, 1])]
-    vertices = np.zeros((num_vertices + 4, 2))
+    vertices = np.zeros((num_vertices + num_corners, 2))
     valid_vertices = 0
-    vertices[:4] = corners
+    vertices[:num_corners] = corners
     c = 0
     while valid_vertices < num_vertices:
-        vertices[valid_vertices + 4, 0] = np.random.uniform(*min_max_x)
-        vertices[valid_vertices + 4, 1] = np.random.uniform(*min_max_y)
-        this_tri = Delaunay(vertices[: 5 + valid_vertices])
+        vertices[valid_vertices + num_corners, 0] = np.random.uniform(*min_max_x)
+        vertices[valid_vertices + num_corners, 1] = np.random.uniform(*min_max_y)
+        this_tri = Delaunay(vertices[: num_corners + 1 + valid_vertices])
         points_simplex = this_tri.find_simplex(points)
         event_simplex = points_simplex[: points.shape[0]]
         if (points_simplex != -1).all():
@@ -75,14 +76,14 @@ def make_valid_delaunay(points, num_vertices, corners):
         c += 1
         if c > 10_000:
             logger.debug("Arg, again!")
-            vertices = np.zeros((num_vertices + 4, 2))
-            vertices[:4] = corners
+            vertices = np.zeros((num_vertices + num_corners, 2))
+            vertices[:num_corners] = corners
             valid_vertices = 0
             c = 0
-    return vertices[4:]
+    return vertices[num_corners:]
 
 
-def set_uniform_priors(corners, ndims):
+def set_uniform_priors(corners, ndims, weight_min, weight_max):
     """
     """
     priors = {
@@ -93,10 +94,10 @@ def set_uniform_priors(corners, ndims):
                 1: uniform_dist(
                     corners[:, 1].min(), corners[:, 1].max()
                 ),
-                2: uniform_dist(-15, 10)
+                2: uniform_dist(weight_min, weight_max)
                 },
             "corners": {
-                d: uniform_dist(-15, 10) for d in range(ndims["corners"])
+                d: uniform_dist(weight_min, weight_max) for d in range(ndims["corners"])
                 }
             }
     return priors
@@ -150,90 +151,6 @@ def define_moves(event_barycenters, nleaves_min, nleaves_max, priors):
 
 
 
-def check_prior_range(astro_pop, Nevents, prior):
-    """
-    """
-    xgrid = np.linspace(-10,10,101)
-    ygrid = np.linspace(-10,10,101)
-    X, Y = np.meshgrid(xgrid, ygrid)
-    grid = np.c_[X.ravel(), Y.ravel()]
-    dx = xgrid[1] - xgrid[0]
-    dy = ygrid[1] - ygrid[0]
-
-    ## Prior rate ##
-    d2N_prior = np.zeros((len(prior), xgrid.shape[0], ygrid.shape[0]))
-    for ind in range(len(prior)):
-        this_delo = delaunaytor.CPUDelaunayInterpolator()
-        this_delo.triangulate(prior[ind])
-        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
-        d2N_prior[ind] = np.exp(log_rate)
-
-    ## Compute `astro' rate
-    pdf = astro_pop.pdf(np.array([X,Y]).T)
-    rate_astro = pdf * Nevents
-
-    prior_is_ok = True
-    low = np.quantile(d2N_prior, 0.05, axis=0)
-    high = np.quantile(d2N_prior, 0.95, axis=0)
-    if not (low <= rate_astro).all():
-        print('WARNING: Astro rate is not always above the prior range.')
-        print('You might want to lower the range of weight distribution.')
-        prior_is_ok = False
-        if not (rate_astro <= high).all():
-            print('WARNING: Astro rate is not always below the prior range.')
-            print('You might want to increase the range of weight distribution.')
-            prior_is_ok = False
-    else:
-        print('Astro rate is well within the prior range.')
-
-
-def check_prior_range_marginals(astro_pop, Nevents, prior):
-    """
-    """
-    xgrid = np.linspace(-10,10,101)
-    ygrid = np.linspace(-10,10,101)
-    X, Y = np.meshgrid(xgrid, ygrid)
-    grid = np.c_[X.ravel(), Y.ravel()]
-    dx = xgrid[1] - xgrid[0]
-    dy = ygrid[1] - ygrid[0]
-
-    ## Prior rate ##
-    log10_dNdx_prior = np.zeros((len(prior), xgrid.shape[0]))
-    log10_dNdy_prior = np.zeros((len(prior), ygrid.shape[0]))
-    for ind in range(len(prior)):
-        this_delo = delaunaytor.CPUDelaunayInterpolator()
-        this_delo.triangulate(prior[ind])
-        log_rate = this_delo.interpolate(grid).reshape(ygrid.shape[0], xgrid.shape[0])
-        log10_dNdx_prior[ind] = (special.logsumexp(log_rate, axis=0) + np.log(dy)) / np.log(10)
-        log10_dNdy_prior[ind] = (special.logsumexp(log_rate, axis=1) + np.log(dx)) / np.log(10)
-
-    ## Compute `astro' marginals
-    pdf = astro_pop.pdf(np.array([X,Y]).T)
-    x_pdf_astro = np.trapezoid(x=ygrid, y=pdf, axis=1)
-    y_pdf_astro = np.trapezoid(x=xgrid, y=pdf, axis=0)
-    x_rate_astro = x_pdf_astro * Nevents
-    y_rate_astro = y_pdf_astro * Nevents
-
-    astro_rates = [x_rate_astro,y_rate_astro]
-    prior_rates = [log10_dNdx_prior,log10_dNdy_prior]
-    prior_is_ok = True
-    for n,data in enumerate(prior_rates):
-        low = np.quantile(data, 0.05, axis=0)
-        high = np.quantile(data, 0.95, axis=0)
-        if not (low <= np.log10((astro_rates[n]))).all():
-            print('WARNING: Astro rate over dimension %i is not always above the prior range'%n)
-            print('You might want to lower the range of weight distribution')
-            prior_is_ok = False
-        elif not (np.log10((astro_rates[n])) <= high).all():
-            print('WARNING: Astro rate over dimension %i is not always below the prior range'%n)
-            print('You might want to increase the range of weight distribution')
-            prior_is_ok = False
-        else:
-            print('\tAstro rate is well within the prior range in dimension %i' %n)
-    return prior_is_ok
-
-
-
 
 ##################################################################
 ### Run it!
@@ -263,6 +180,9 @@ if __name__ == "__main__":
     parser.add_argument("--injections", dest='Ninjections', help="Number of injections", type=int, default=1_000_000)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=6)
+    # Prior range
+    parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-30)
+    parser.add_argument("--wmax", dest='wmax', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=4)
     parser.add_argument("--temps", dest='ntemps', help="Number of temperatures", type=int, default=2)
@@ -290,6 +210,8 @@ if __name__ == "__main__":
     )
 
     corners = np.array([[-10,-10],[-10,10],[10,-10],[10,10]])
+    if samples.max()>corners.max() or samples.min()<corners.min():
+        raise ValueError('Some samples are outside the box.')
     # Some properties of the delaunay sampling scheme
     branch_names = ["tri", "corners"]
     ndims = {"tri": 3, "corners": 4}
@@ -309,7 +231,7 @@ if __name__ == "__main__":
         np.savetxt(filename, np.vstack([detected_injections.T, injection_priors]).T, header='last column is injection prior')
 
     # Set likelihood
-    priors = set_uniform_priors(corners, ndims)
+    priors = set_uniform_priors(corners, ndims, weight_min=args.wmin, weight_max=args.wmax)
     event_logpriors = np.ones(samples.shape[0])
     log_like_fn = SquareLogLikelihood(
             corners=corners,
@@ -323,34 +245,6 @@ if __name__ == "__main__":
             minus_infinity=-1e300,
             )
 
-    # Check that `astro' event rate is within priors
-    #filename = 'prior_triangulations.txt'
-    filename = 'prior_triangulations.npy'
-    if not os.path.exists(filename):
-        print('Computing prior triangulations')
-        #triangulations_prior = np.zeros((100, args.Nstart+corners.shape[0],ndims['tri']))
-        triangulations_prior = np.zeros(100, dtype='object')
-        for t in trange(len(triangulations_prior)):
-            le_log = -np.inf
-            Nstart = np.random.randint(nleaves_min['tri'], nleaves_max['tri'])
-            for _ in range(10_000):
-                init_proposal = initial_delaunay_proposal(event_barycenters, corners, Nstart,
-                                                          priors, ndims,
-                )
-                le_log = log_like_fn([init_proposal[key] for key in ["tri", "corners"]]) or -1e300
-                if le_log > -1e300:
-                    triangulations_prior[t] = np.vstack([init_proposal['tri'],np.c_[corners,init_proposal['corners'].T]])
-                    break
-        #tosave = triangulations_prior.reshape(triangulations_prior.shape[0],triangulations_prior.shape[1]*triangulations_prior.shape[2])
-        #np.savetxt(filename, tosave)
-        np.save(filename, triangulations_prior)
-    else:
-        print('Loading prior triangulations from', filename)
-        #triangulations_prior = np.loadtxt(filename)
-        #triangulations_prior = triangulations_prior.reshape(triangulations_prior.shape[0], args.Nstart+corners.shape[0], ndims['tri'])
-        triangulations_prior = np.load(filename, allow_pickle=True)
-    astro_pop = generate_pop(args.mu1,args.cov1,args.mu2,args.cov2)
-    prior_is_ok = check_prior_range(astro_pop, args.Nevents, triangulations_prior)
 
     # Actually start sampling
     filename = 'backend_events%i_samples%i' %(args.Nevents,args.Nsamples)

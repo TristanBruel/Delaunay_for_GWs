@@ -175,7 +175,7 @@ def plot_diagnostics(backend, wmin, wmax, outfile):
         nvertices = backend_nleaves['tri'][:,t,:].ravel()
         hist, _ = np.histogram(nvertices, bins=bins)
         ax.stairs(hist, bins, label='temp %i' %t)
-    ax.axvline(x=4, color='gray', linestyle='--')
+    #ax.axvline(x=backend.nleaves_min['tri'], color='gray', linestyle='--')
     ax.axvline(x=backend.nleaves_max['tri'], color='gray', linestyle='--')
     ax.set_xlabel(r'Number of vertices')
     ax.set_ylabel(r'N')
@@ -321,23 +321,6 @@ def plot_maps(d2N_rates, xgrid, ygrid, zgrid, wmin, wmax,
 
 
 
-def compute_num_events(triangulation_points):
-    tri = delaunaytor.CPUDelaunayInterpolator()
-    tri.triangulate(triangulation_points)
-    weights_in_vertices = tri.weights[tri.triangulation.simplices]
-    weight_diffs = np.c_[
-        (weights_in_vertices[:, 1] - weights_in_vertices[:, 2]),
-        (weights_in_vertices[:, 2] - weights_in_vertices[:, 3]),
-        (weights_in_vertices[:, 3] - weights_in_vertices[:, 0]),
-        (weights_in_vertices[:, 0] - weights_in_vertices[:, 1]),
-    ]
-    bar_integral = (np.exp(weights_in_vertices) * weight_diffs).sum(axis=-1) / (
-        -weight_diffs
-    ).prod(axis=-1)
-    return (2 * tri.volumes() * bar_integral).sum()
-
-
-
 def plot_Nevents(d2N_rates, xgrid, ygrid, zgrid, 
                  Nevents, outfile):
     """
@@ -372,7 +355,6 @@ def plot_Nevents(d2N_rates, xgrid, ygrid, zgrid,
 
     ax.set_xlabel('Estimated number of events')
     ax.set_xscale('log')
-    #ax.set_xlim(xmin=1e-2,xmax=1e2)
     ax.set_ylabel('N')
     ax.set_box_aspect(1)
 
@@ -408,7 +390,7 @@ def plot_marginals(d2N_rates, xgrid, ygrid, zgrid,
         log10_dNdz_prior[ind] = (special.logsumexp(log_rate, axis=(0,1)) + np.log(dx) + np.log(dy)) / np.log(10)
 
     ## Compute `astro' marginals
-    pdf = astro_pop.pdf(np.array([X.flatten(),Y.flatten(),Z.flatten()]).T)
+    pdf = astro_pop.pdf(grid)
     pdf = pdf.reshape(X.shape)
     rate_astro = pdf * Nevents
     x_rate_astro = np.sum(rate_astro, axis=(0,2)) *dy*dz
@@ -434,7 +416,7 @@ def plot_marginals(d2N_rates, xgrid, ygrid, zgrid,
 
     x_labels = [r'$x$', r'$y$', r'$z$']
     grids = [xgrid,ygrid,zgrid]
-    y_labels = [r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}x)$', 
+    y_labels = [r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}x)$',
                 r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}y)$',
                 r'$\mathrm{log}_{10}(\mathrm{dN}/\mathrm{d}z)$',
                 ]
@@ -576,7 +558,7 @@ if __name__ == "__main__":
     else:
         raise ValueError('File %s could not be found.' %filename)
 
-    print('Generating random initial delaunay configuration')
+    print('Generating random initial delaunay configuration...')
     np.random.seed(46)
     le_log = -np.inf
     for _ in range(10_000):

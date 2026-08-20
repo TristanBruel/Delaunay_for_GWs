@@ -59,21 +59,21 @@ def make_injections(Ninjections, observed_events, pdet):
 def make_valid_delaunay(points, num_vertices, corners):
     """
     """
-    
+    num_corners = len(corners)    
     if num_vertices > 3 + points.shape[0]:
         raise ValueError("That number of vertices breaks geometry")
     min_max_x = [np.min(points[:, 0]), np.max(points[:, 0])]
     min_max_y = [np.min(points[:, 1]), np.max(points[:, 1])]
     min_max_z = [np.min(points[:, 2]), np.max(points[:, 2])]
-    vertices = np.zeros((num_vertices + 8, 3))
+    vertices = np.zeros((num_vertices + num_corners, 3))
     valid_vertices = 0
-    vertices[:8] = corners
+    vertices[:num_corners] = corners
     c = 0
     while valid_vertices < num_vertices:
-        vertices[valid_vertices + 8, 0] = np.random.uniform(*min_max_x)
-        vertices[valid_vertices + 8, 1] = np.random.uniform(*min_max_y)
-        vertices[valid_vertices + 8, 2] = np.random.uniform(*min_max_z)
-        this_tri = Delaunay(vertices[: 9 + valid_vertices])
+        vertices[valid_vertices + num_corners, 0] = np.random.uniform(*min_max_x)
+        vertices[valid_vertices + num_corners, 1] = np.random.uniform(*min_max_y)
+        vertices[valid_vertices + num_corners, 2] = np.random.uniform(*min_max_z)
+        this_tri = Delaunay(vertices[: num_corners + 1 + valid_vertices])
         points_simplex = this_tri.find_simplex(points)
         event_simplex = points_simplex[: points.shape[0]]
         if (points_simplex != -1).all():
@@ -81,11 +81,11 @@ def make_valid_delaunay(points, num_vertices, corners):
         c += 1
         if c > 10_000:
             logger.debug("Arg, again!")
-            vertices = np.zeros((num_vertices + 8, 3))
-            vertices[:8] = corners
+            vertices = np.zeros((num_vertices + num_corners, 3))
+            vertices[:num_corners] = corners
             valid_vertices = 0
             c = 0
-    return vertices[8:]
+    return vertices[num_corners:]
 
 
 
