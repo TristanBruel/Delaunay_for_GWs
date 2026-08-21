@@ -85,13 +85,13 @@ def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t):
 parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
 total_dimensions = len(parameter_keys)
 
-data_file = np.load("../lvk_z_m/lvc_data_lvc_samples_full.npz")
+data_file = np.load("./lvc_data_lvc_samples_full.npz")
 observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
 event_logpriors = np.log(data_file["priors"])
 num_events = data_file["nevents"][0]
 num_samples = data_file["nsamples"][0]
 
-injections_file = np.load("../lvk_z_m/selection_function_elements.npz")
+injections_file = np.load("./selection_function_elements.npz")
 detected_injections = np.vstack(
     [injections_file[key + "s"] for key in parameter_keys]
 ).T
