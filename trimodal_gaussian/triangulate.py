@@ -34,6 +34,7 @@ class SquareLogLikelihood(delaunaytor.DelaunayLogLikelihood):
         return super().__call__(triangulation_parameters)
 
 
+
 def make_injections(Ninjections, observed_events, pdet):
     """
     """
@@ -54,38 +55,6 @@ def make_injections(Ninjections, observed_events, pdet):
     print('Number of detected injections:', len(detected_injections))
     injection_priors = np.ones(detected_injections.shape[0]) / (dX * dY * dZ)
     return detected_injections, injection_priors
-
-
-def make_valid_delaunay(points, num_vertices, corners):
-    """
-    """
-    num_corners = len(corners)    
-    if num_vertices > 3 + points.shape[0]:
-        raise ValueError("That number of vertices breaks geometry")
-    min_max_x = [np.min(points[:, 0]), np.max(points[:, 0])]
-    min_max_y = [np.min(points[:, 1]), np.max(points[:, 1])]
-    min_max_z = [np.min(points[:, 2]), np.max(points[:, 2])]
-    vertices = np.zeros((num_vertices + num_corners, 3))
-    valid_vertices = 0
-    vertices[:num_corners] = corners
-    c = 0
-    while valid_vertices < num_vertices:
-        vertices[valid_vertices + num_corners, 0] = np.random.uniform(*min_max_x)
-        vertices[valid_vertices + num_corners, 1] = np.random.uniform(*min_max_y)
-        vertices[valid_vertices + num_corners, 2] = np.random.uniform(*min_max_z)
-        this_tri = Delaunay(vertices[: num_corners + 1 + valid_vertices])
-        points_simplex = this_tri.find_simplex(points)
-        event_simplex = points_simplex[: points.shape[0]]
-        if (points_simplex != -1).all():
-            valid_vertices += 1
-        c += 1
-        if c > 10_000:
-            logger.debug("Arg, again!")
-            vertices = np.zeros((num_vertices + num_corners, 3))
-            vertices[:num_corners] = corners
-            valid_vertices = 0
-            c = 0
-    return vertices[num_corners:]
 
 
 
@@ -110,22 +79,6 @@ def set_uniform_priors(corners, ndims, weight_min, weight_max):
                 }
             }
     return priors
-
-
-def initial_delaunay_proposal(event_barycenters, corners, nstart,
-                              priors, ndims,
-                              ):
-    """
-    """
-
-    test = make_valid_delaunay(event_barycenters, num_vertices=nstart, corners=corners)
-    init_proposal = {"tri": np.c_[test, priors["tri"][3].rvs(nstart)]
-                     } | {
-                        branch: np.array(
-                            [priors[branch][dim_indx].rvs() for dim_indx in range(ndims[branch])]).squeeze()
-                        for branch in priors if branch != "tri"
-                        }
-    return init_proposal
 
 
 

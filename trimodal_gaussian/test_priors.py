@@ -6,7 +6,7 @@ from scipy import stats, special
 from scipy.spatial import Delaunay
 from local_utils import delaunaytor
 from generate_events import generate_pop 
-from triangulate import set_uniform_priors
+from triangulate import set_uniform_priors 
 
 import os
 import argparse
@@ -27,6 +27,53 @@ def make_delaunay(num_vertices, corners):
     vertices[8:, 2] = np.random.uniform(*min_max_z, size=num_vertices)
     return vertices[8:]
 
+
+def make_valid_delaunay(points, num_vertices, corners):
+    """
+    """
+    num_corners = len(corners)
+    if num_vertices > 3 + points.shape[0]:
+        raise ValueError("That number of vertices breaks geometry")
+    min_max_x = [np.min(points[:, 0]), np.max(points[:, 0])]
+    min_max_y = [np.min(points[:, 1]), np.max(points[:, 1])]
+    min_max_z = [np.min(points[:, 2]), np.max(points[:, 2])]
+    vertices = np.zeros((num_vertices + num_corners, 3))
+    valid_vertices = 0
+    vertices[:num_corners] = corners
+    c = 0
+    while valid_vertices < num_vertices:
+        vertices[valid_vertices + num_corners, 0] = np.random.uniform(*min_max_x)
+        vertices[valid_vertices + num_corners, 1] = np.random.uniform(*min_max_y)
+        vertices[valid_vertices + num_corners, 2] = np.random.uniform(*min_max_z)
+        this_tri = Delaunay(vertices[: num_corners + 1 + valid_vertices])
+        points_simplex = this_tri.find_simplex(points)
+        event_simplex = points_simplex[: points.shape[0]]
+        if (points_simplex != -1).all():
+            valid_vertices += 1
+        c += 1
+        if c > 10_000:
+            logger.debug("Arg, again!")
+            vertices = np.zeros((num_vertices + num_corners, 3))
+            vertices[:num_corners] = corners
+            valid_vertices = 0
+            c = 0
+    return vertices[num_corners:]
+
+
+def initial_delaunay_proposal(event_barycenters, corners, nstart,
+                              priors, ndims,
+                              ):
+    """
+    """
+
+    test = make_valid_delaunay(event_barycenters, num_vertices=nstart, corners=corners)
+    init_proposal = {"tri": np.c_[test, priors["tri"][3].rvs(nstart)]
+                     } | {
+                        branch: np.array(
+                            [priors[branch][dim_indx].rvs() for dim_indx in range(ndims[branch])]).squeeze()
+                        for branch in priors if branch != "tri"
+                        }
+    return init_proposal
 
 
 def make_some_checks(astro_pop, prior, Nevents, plot_dir='./'):
@@ -170,6 +217,7 @@ if __name__ == "__main__":
                         )
     # Events and samples
     parser.add_argument("--events", dest='Nevents', help="Number of events", type=int, default=1_000)
+    parser.add_argument("--samples", dest='Nsamples', help="Number of samples per event", type=int, default=10_000)
     # Prior range
     parser.add_argument("--wmin", dest='wmin', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-50)
     parser.add_argument("--wmax", dest='wmax', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
@@ -188,15 +236,31 @@ if __name__ == "__main__":
     nleaves_min = {"tri": 8, "corners": 1}
     nleaves_max = {"tri": 100, "corners": 1}
 
+    filename = 'samples.txt'
+    outfile = os.path.join(work_dir,filename)
+    if os.path.exists(outfile):
+        print('Loading samples from:', outfile)
+        samples = np.loadtxt(outfile)
+        Nevents_det = int(len(samples)/args.Nsamples)
+        print('Number of detected events:', Nevents_det)
+    else:
+        raise ValueError("File %s could not be found." %outfile)
+    event_limits = np.arange(0,len(samples),args.Nsamples)
+    event_barycenters = (
+        np.add.reduceat(samples, event_limits, axis=0) /args.Nsamples
+    )
+
     # Load triangulations from prior
     priors = set_uniform_priors(corners, ndims, weight_min=args.wmin, weight_max=args.wmax)
-    filename = 'prior_triangulations.npy'
+    #filename = 'prior_triangulations.npy'
+    filename = 'prior_triangulations_valid.npy'
     if not os.path.exists(filename):
         print('Computing prior triangulations')
         triangulations_prior = np.zeros(100, dtype='object')
         for t in trange(len(triangulations_prior)):
             Nstart = np.random.randint(nleaves_min['tri'], nleaves_max['tri'])
-            test = make_delaunay(num_vertices=Nstart, corners=corners)
+            #test = make_delaunay(num_vertices=Nstart, corners=corners)
+            test = make_valid_delaunay(points=event_barycenters, num_vertices=Nstart, corners=corners)
             init_proposal = {"tri": np.c_[test, priors["tri"][3].rvs(Nstart)]
                      } | {
                         branch: np.array(
