@@ -52,11 +52,11 @@ logging.basicConfig(
 os.makedirs(f"{label}", exist_ok=True)
 savefig = lambda fig, name: fig.savefig(f"{label}/{name}.pdf")
 
-z_min = 0.
+z_min = 1e-6
 z_max = 2.3
 m1_min = 2.0
 m1_max = 100.0 + 1e-6
-q_min = 0.
+q_min = 1e-6
 q_max = 1.
 
 def chi_log_pdf(chi, mu_chi, var_chi):
@@ -318,17 +318,17 @@ ndims = dict(zip(branch_names, [4, 8, 2, 2]))
 nleaves_min = dict(zip(branch_names, [4, 1, 1, 1]))
 nleaves_max = dict(zip(branch_names, [40, 1, 1, 1]))
 
-start_with_this_many = 6
+start_with_this_many = 10
 
 priors = {
     "tri": {
         0: uniform_dist(m1_min, m1_max),
         1: uniform_dist(z_min, z_max),
         2: uniform_dist(q_min, q_max),
-        3: uniform_dist(-5, 15),
+        3: uniform_dist(-20, 15),
     },
     "corner_w": {
-        i: uniform_dist(-5, 15) for i in range(ndims["corner_w"])
+        i: uniform_dist(-20, 15) for i in range(ndims["corner_w"])
     },
     "chi": {
         0: uniform_dist(0, 0.95),
@@ -396,13 +396,13 @@ for t, w in product(range(ntemps), range(nwalkers)):
     else:
         raise ValueError("Didn't work")
 
-    print(t, w, le_log)
+    #print(t, w, le_log)
     for branch in init_proposal:
         coords[branch][
             t, w, : (start_with_this_many if branch == "tri" else nleaves_max[branch])
         ] = init_proposal[branch]
 
-    print(le_log)
+    #print(le_log)
 
 from eryn.moves import MHMove
 
@@ -515,7 +515,7 @@ with Pool(nproc) as pool:
     )
     last_sample = ensemble.run_mcmc(state, nsteps, burn=nburn, progress=True, thin_by=1)
 
-print(ensemble.backend.rj_accepted)
+#print(ensemble.backend.rj_accepted)
 
 with open(f"{label}/backend", "wb") as f:
     pickle.dump(ensemble.backend, f)
