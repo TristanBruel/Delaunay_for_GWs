@@ -22,7 +22,9 @@ snrs_grid=file['snrs_grid']
 
 Dfix=500
 
-snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid],snrs_grid)
+snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid], snrs_grid, 
+                                   bounds_error=False, fill_value=None,
+                                   )
 
 
 #filename = "BBHMassSpinRedshift_BrokenPowerLawTwoPeaks_GaussianComponentSpins_PowerLawRedshift.h5"
@@ -41,7 +43,7 @@ params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
 params['m1_low']=hyper_samples[id_sample,7]
-params['m1_high']=150.
+params['m1_high']=300.
 params['mu_1']=hyper_samples[id_sample,8]
 params['sigma_1']=hyper_samples[id_sample,9] 
 params['mu_2'] = hyper_samples[id_sample,10] 
@@ -79,15 +81,6 @@ snr_th=8
 
 
 ninj=3000000
-
-zs_grid=np.linspace(0,zmax,1000)
-dVc=np.copy(Planck15.differential_comoving_volume(zs_grid))*4.*np.pi
-dVc_spl=spline(zs_grid,dVc)
-
-dls=np.copy(Planck15.luminosity_distance(zs_grid))
-zs_dl_spline=spline(dls,zs_grid)
-dl_zs_spline=spline(zs_grid,dls)
-ddl_zs_spline=dl_zs_spline.derivative()
 
 
 seed=0

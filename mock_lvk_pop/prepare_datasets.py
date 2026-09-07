@@ -13,7 +13,7 @@ import os
 thetas_draw=utils.draw_thetas(10000)
 kde_theta=gaussian_kde(thetas_draw,bw_method='scott')
 
-seeds=[5]
+seeds=[0,1,2]
 
 
 no_selection=0
@@ -23,8 +23,7 @@ sample_in_mtot=0
 sample_in_z=0
 sample_in_source=0
 nsamples_ev=5000
-#nevs=153
-nevs=259
+nevs=153
 # large_snr=1
 very_large_snr=0
 snr_th=8
@@ -84,7 +83,7 @@ params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
 params['m1_low']=hyper_samples[id_sample,7]
-params['m1_high']=150.
+params['m1_high']=300.
 params['mu_1']=hyper_samples[id_sample,8]
 params['sigma_1']=hyper_samples[id_sample,9] 
 params['mu_2'] = hyper_samples[id_sample,10] 
@@ -118,7 +117,9 @@ m2s_grid=file['m2s_grid']
 # else:
 snrs_grid=file['snrs_grid']
     
-snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid],snrs_grid)
+snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid], snrs_grid,
+                                   bounds_error=False, fill_value=None,
+                                   )
 Dfix=500
 
 print(np.amin(m1s_grid),np.amax(m1s_grid),np.amin(m2s_grid),np.amax(m2s_grid))
