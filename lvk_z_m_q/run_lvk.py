@@ -222,10 +222,10 @@ class M1ZQDelaunay:
             logger.debug("Variances are bad")
             return self.minus_infinity
 
-        log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
-        if ((log_effective_sample_sizes < np.log(self.num_events))).any():
-            logger.debug(f"Effective sample size is too low")
-            return self.minus_infinity
+        #log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
+        #if ((log_effective_sample_sizes < np.log(self.num_events))).any():
+        #    logger.debug(f"Effective sample size is too low")
+        #    return self.minus_infinity
 
 
         Nxi_presum = Nxi_tri * np.exp(
