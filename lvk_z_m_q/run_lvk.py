@@ -53,10 +53,10 @@ os.makedirs(f"{label}", exist_ok=True)
 savefig = lambda fig, name: fig.savefig(f"{label}/{name}.pdf")
 
 z_min = 1e-6
-z_max = 2.3
-m1_min = 2.0
+z_max = 2.5
+m1_min = 3.0
 m1_max = 100.0 + 1e-6
-q_min = 1e-6
+q_min = 0.
 q_max = 1.
 
 def chi_log_pdf(chi, mu_chi, var_chi):
@@ -253,6 +253,18 @@ class M1ZQDelaunay:
             logger.debug("Not enough injection stuff")
             return self.minus_infinity
 
+        ## GWTC-4 threshold on variance in log-likelihood estimator ##
+        var_single_event = (
+                    np.exp(log_variance_likes) /(self.num_samples-1)
+                    - (np.exp(log_bayes_factors) /self.num_samples)**2
+                ) /(self.num_samples)
+        var_loglike_estimator = np.sum(
+                    var_single_event /(np.exp(log_bayes_factors) /self.num_samples)**2
+                ) + self.num_events**2 *var /Nxi**2
+        if var_loglike_estimator > 1:
+            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
+            return self.minus_infinity
+
         #actual_log_num_samples = np.log(samples_inside_tri.sum(axis=1))
         actual_log_num_samples = self.log_num_samples
 
@@ -260,33 +272,31 @@ class M1ZQDelaunay:
         return result.item()
 
 def make_valid_delaunay(event_points, num_vertices, corners):
-    
-    points = event_points
+    inside_corners = np.array([
+        (event_points[:,i]>np.min(corners[:,i]))&(event_points[:,i]<np.max(corners[:,i]))
+        for i in range(points.shape[1])
+        ])
+    inside_corners = np.sum(inside_corners,axis=0)==event_points.shape[1]
+    points = event_points[inside_corners]
     dim = 3
     offset = 2**dim
-    
     min_max = np.array([
         [np.min(points[:, i]), np.max(points[:, i])]
         for i in range(points.shape[1])
     ])
-
     vertices = np.zeros((num_vertices + offset, dim))
     valid_vertices = 0
     vertices[:offset] = corners
-
     c = 0
     while valid_vertices < num_vertices:
         vertices[valid_vertices + offset, :] = np.random.uniform(
             low=min_max[:, 0], high=min_max[:, 1]
         )
-        
         this_tri = Delaunay(vertices[: offset + 1 + valid_vertices])
         points_simplex = this_tri.find_simplex(points)
-        event_simplex = points_simplex[: event_points.shape[0]]
-
+        #event_simplex = points_simplex[: event_points.shape[0]]
         if (points_simplex != -1).all():
             valid_vertices += 1
-
     return vertices[offset:]
 
 
