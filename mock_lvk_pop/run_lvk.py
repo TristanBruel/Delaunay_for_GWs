@@ -24,7 +24,6 @@ from eryn.moves import DistributionGenerateRJ, StretchMove, GaussianMove
 from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
-import corner
 from tqdm import trange
 
 from local_utils import delaunaytor
@@ -86,14 +85,14 @@ def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t):
 parameter_keys = ["m1", "z", "m2"]
 total_dimensions = len(parameter_keys)
 
-data_file = np.load("./samples_no_mass_gap_pop_259_evs_5000_samples_sample_in_q_zmax_2.0_seed_5.npz")
+data_file = np.load("./datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_2.0_seed_0.npz")
 observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
 observed_events[:,2] /= observed_events[:,0] # turn secondary mass into mass ratio
 event_logpriors = np.log(data_file["priors"])
 num_samples = data_file["nsamples_ev"]
 num_events = int(observed_events.shape[0] /num_samples)
 
-injections_file = np.load("./injections.npz")
+injections_file = np.load("./injections/injections.npz")
 detected_injections = np.vstack(
     [injections_file[key + "s_inj"] for key in parameter_keys]
 ).T
@@ -224,13 +223,14 @@ class M1ZQDelaunay:
             2 * to_integrate, b=samples_inside_tri, axis=-1
         )
         if np.isnan(log_variance_likes).any():
+            print(f"Variances are bad")
             logger.debug("Variances are bad")
             return self.minus_infinity
 
-        log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
-        if ((log_effective_sample_sizes < np.log(self.num_events))).any():
-            logger.debug(f"Effective sample size is too low")
-            return self.minus_infinity
+        #log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
+        #if ((log_effective_sample_sizes < np.log(self.num_events))).any():
+        #    logger.debug(f"Effective sample size is too low")
+        #    return self.minus_infinity
 
 
         #Nxi_presum = Nxi_tri * np.exp(
@@ -250,12 +250,16 @@ class M1ZQDelaunay:
         ).sum() / self.num_injections
 
 
+        #var = (
+        #    (integrand / self.num_injections) ** 2
+        #).sum() - Nxi**2 / self.num_injections
         var = (
-            (integrand / self.num_injections) ** 2
-        ).sum() - Nxi**2 / self.num_injections
+            (integrand**2).sum() / (self.num_injections - 1) - Nxi**2 
+            ) /self.num_injections
 
         n_eff = Nxi**2 / var
         if n_eff <= 4 * self.num_events:
+            print(f"Not enough injection stuff")
             logger.debug("Not enough injection stuff")
             return self.minus_infinity
 
@@ -268,6 +272,7 @@ class M1ZQDelaunay:
                     var_single_event /(np.exp(log_bayes_factors) /self.num_samples)**2
                 ) + self.num_events**2 *var /Nxi**2
         if var_loglike_estimator > 1:
+            print(f"Variance in log-likelihood estimator exceeds 1")
             logger.debug(f"Variance in log-likelihood estimator exceeds 1")
             return self.minus_infinity
 
@@ -277,10 +282,11 @@ class M1ZQDelaunay:
         result = (log_bayes_factors - actual_log_num_samples).sum() - Nxi
         return result.item()
 
+
 def make_valid_delaunay(event_points, num_vertices, corners):
     inside_corners = np.array([
         (event_points[:,i]>np.min(corners[:,i]))&(event_points[:,i]<np.max(corners[:,i])) 
-        for i in range(points.shape[1])
+        for i in range(event_points.shape[1])
         ])
     inside_corners = np.sum(inside_corners,axis=0)==3
     points = event_points[inside_corners]
@@ -337,7 +343,7 @@ ndims = dict(zip(branch_names, [4, 8]))
 nleaves_min = dict(zip(branch_names, [4, 1]))
 nleaves_max = dict(zip(branch_names, [40, 1]))
 
-start_with_this_many = 10
+start_with_this_many = 20
 
 priors = {
     "tri": {
@@ -387,7 +393,7 @@ for t, w in product(range(ntemps), range(nwalkers)):
                 make_valid_delaunay(
                     barycenters,
                     start_with_this_many,
-                    log_like_fn.corners,
+                    corners,
                 ),
                 priors["tri"][3].rvs(size=start_with_this_many),
                 

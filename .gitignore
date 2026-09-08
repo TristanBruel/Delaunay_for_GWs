@@ -1,8 +1,8 @@
 */__pycache__/
 trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
-lvk_z_m_q/test*/backend*
+lvk_z_m_q/test*/
 mock_lvk_pop/datasets/*
 mock_lvk_pop/injections/*
-mock_lvk_pop/test*/backend*
-gwtc5_z_m1_q/gwtc5_samples_full.npz
+mock_lvk_pop/test*/
+gwtc5_z_m1_q/*.npz
