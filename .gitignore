@@ -1,7 +1,9 @@
 */__pycache__/
+*/*/__pycache__/
 trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
-lvk_z_m_q/test*/
+gwtc3_z_m1_q/outdir*/
+gwtc3_z_m1_q/first_test/backend
 mock_lvk_pop/datasets/*
 mock_lvk_pop/injections/*
 mock_lvk_pop/test*/
