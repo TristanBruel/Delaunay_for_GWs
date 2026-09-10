@@ -55,7 +55,7 @@ savefig = lambda fig, name: fig.savefig(f"{label}/{name}.pdf")
 z_min = 1e-6
 z_max = 2.5
 m1_min = 3.0
-m1_max = 200.0 + 1e-6
+m1_max = 100.0 + 1e-6
 q_min = 0.
 q_max = 1.
 
@@ -82,21 +82,21 @@ def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t):
 
 
 # READ data and injections
-parameter_keys = ["m1", "z", "q", "chi1", "chi2", "cos_tilt_1", "cos_tilt_2"]
+parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
 total_dimensions = len(parameter_keys)
 
-data_file = np.load("./gwtc5_samples.npz")
+data_file = np.load("./lvc_data_lvc_samples_full.npz")
 observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
 event_logpriors = np.log(data_file["priors"])
-num_events = int(data_file["nevents"])
-num_samples = int(data_file["nsamples"])
+num_events = data_file["nevents"][0]
+num_samples = data_file["nsamples"][0]
 
-injections_file = np.load("./gwtc5_injections_full.npz")
+injections_file = np.load("./selection_function_elements.npz")
 detected_injections = np.vstack(
     [injections_file[key + "s"] for key in parameter_keys]
 ).T
 injection_priors = injections_file["inj_priors"]
-num_injections = int(injections_file["ninjs"])
+num_injections = injections_file["ninjs"]
 
 
 class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
@@ -248,10 +248,10 @@ class M1ZQDelaunay:
             (integrand / self.num_injections) ** 2
         ).sum() - Nxi**2 / self.num_injections
 
-        #n_eff = Nxi**2 / var
-        #if n_eff <= 4 * self.num_events:
-        #    logger.debug("Not enough injection stuff")
-        #    return self.minus_infinity
+        n_eff = Nxi**2 / var
+        if n_eff <= 4 * self.num_events:
+            logger.debug("Not enough injection stuff")
+            return self.minus_infinity
 
         ## GWTC-4 threshold on variance in log-likelihood estimator ##
         var_single_event = (
@@ -274,9 +274,9 @@ class M1ZQDelaunay:
 def make_valid_delaunay(event_points, num_vertices, corners):
     inside_corners = np.array([
         (event_points[:,i]>np.min(corners[:,i]))&(event_points[:,i]<np.max(corners[:,i]))
-        for i in range(corners.shape[1])
+        for i in range(event_points.shape[1])
         ])
-    inside_corners = np.sum(inside_corners,axis=0)==corners.shape[1]
+    inside_corners = np.sum(inside_corners,axis=0)==event_points.shape[1]
     points = event_points[inside_corners]
     dim = 3
     offset = 2**dim
@@ -323,7 +323,7 @@ log_like_fn = M1ZQDelaunay(
     corners=corners,
 )
 
-branch_names = ["tri", "corner_w", "chi", "cos_tilt"]
+branch_names = ["tri", "corner_w", "chi", "tilt"]
 ndims = dict(zip(branch_names, [4, 8, 2, 2]))
 nleaves_min = dict(zip(branch_names, [4, 1, 1, 1]))
 nleaves_max = dict(zip(branch_names, [40, 1, 1, 1]))
@@ -344,7 +344,7 @@ priors = {
         0: uniform_dist(0, 0.95),
         1: uniform_dist(0.005, 0.25)
     },
-    "cos_tilt": {
+    "tilt": {
         0: uniform_dist(0, 1),
         1: uniform_dist(0.1, 4)
     }
@@ -380,7 +380,7 @@ for t, w in product(range(ntemps), range(nwalkers)):
                     start_with_this_many,
                     log_like_fn.corners,
                 ),
-                priors["tri"][2].rvs(size=start_with_this_many),
+                priors["tri"][3].rvs(size=start_with_this_many),
                 
             ]
         } | {
@@ -395,7 +395,7 @@ for t, w in product(range(ntemps), range(nwalkers)):
             log_like_fn(
                 [
                     init_proposal[key]
-                    for key in branch_names
+                    for key in ["tri", "corner_w", "chi", "tilt"]
                 ]
             )
             or -1e300
@@ -477,24 +477,26 @@ class BinGaussRelMove(MHMove):
 
 
 moves = [
-    (BinGaussRelMove(
+    BinGaussRelMove(
         sigma_vertices=0.1 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
         weights_scale=1.,
         ind_leaf=ind_leaf,
         branch_name="tri",
-    ),
-    0.8)
+    )
     for ind_leaf in range(nleaves_max["tri"])
 ]
 moves += [
-    (StretchMove(
-        gibbs_sampling_setup=["corner_w", "chi", "cos_tilt"],
+    StretchMove(
+        gibbs_sampling_setup=["corner_w", "chi", "tilt"],
         live_dangerously=True,
-    ),
-    0.2)
+    )
 ]
-moves += [(StretchMove(gibbs_sampling_setup=["chi"], live_dangerously=True), 0.2)]
-moves += [(StretchMove(gibbs_sampling_setup=["cos_tilt"],live_dangerously=True), 0.2)]
+moves += [
+    StretchMove(
+        gibbs_sampling_setup=["tilt"],
+        live_dangerously=True
+    )
+]
 
 prior_move = DistributionGenerateRJ(
     {key: ProbDistContainer(priors[key]) for key in priors},
