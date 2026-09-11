@@ -54,11 +54,14 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
         log_Nxi = self.delaunay_interpolator._interpolate(inj_simplex, inj_b)
 
-        maybe_infinity = np.exp(log_Nxi)
-        if np.isinf(maybe_infinity).any():
-            return self.minus_infinity
-
         inj_inside = inj_simplex != -1
+        maybe_infinity = np.exp(log_Nxi)
+
+        if np.isinf(inj_inside * maybe_infinity).any():
+            return self.minus_infinity
+        maybe_infinity[
+                np.where(maybe_infinity > 1e300)
+                ] = 0 # injections outside the corner box are not used further out
 
         return (
             log_dNdtheta_samples,
@@ -148,7 +151,15 @@ class M1ZQDelaunay:
                 )
         ).reshape(self.num_events, self.num_samples)
 
-        NL_j_to_sum = samples_inside_tri * np.exp(log_dNdtheta - self.events_log_prior)
+        maybe_inf = np.exp(log_dNdtheta - self.events_log_prior)
+        if np.isinf(samples_inside_tri * maybe_inf).any():
+            return self.minus_infinity
+        maybe_inf[
+                np.where(np.isinf(maybe_inf))
+                ] = 0 # events outside the corner box are not used further out
+
+        #NL_j_to_sum = samples_inside_tri * np.exp(log_dNdtheta - self.events_log_prior)
+        NL_j_to_sum = samples_inside_tri * maybe_inf
         NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
         var_NL_j = (
             (NL_j_to_sum**2).sum(axis=-1) / (self.num_samples - 1) - NL_j**2
@@ -173,6 +184,7 @@ class M1ZQDelaunay:
             (
                 self.num_events
                 #/ self.delaunay_rate.delaunay_interpolator.compute_events()
+                /Nxi
             )
             ** 2
             * ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
