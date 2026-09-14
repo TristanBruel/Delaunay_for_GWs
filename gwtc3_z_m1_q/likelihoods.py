@@ -164,8 +164,14 @@ class M1ZQDelaunay:
 
 
         Nxi_presum = Nxi_tri * np.exp(
-            (chi_log_pdf(self.detected_injections[:, 3], mu_var_chi[0], mu_var_chi[1]))
-            + chi_log_pdf(self.detected_injections[:, 4], mu_var_chi[0], mu_var_chi[1])
+            chi_log_pdf(
+                self.detected_injections[:, 3], 
+                mu_var_chi[0], mu_var_chi[1],
+                )
+            + chi_log_pdf(
+                self.detected_injections[:, 4], 
+                mu_var_chi[0], mu_var_chi[1],
+                )
             + tilts_log_pdf(
                 self.detected_injections[:, 5], self.detected_injections[:, 6],
                 zeta_sigma_t[0], zeta_sigma_t[1],

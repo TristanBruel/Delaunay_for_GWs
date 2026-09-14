@@ -14,6 +14,15 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
+def q_log_prior(q, m1, beta_q, m_min):
+    out_bounds = q * m1 < m_min
+
+    normalisation = (beta_q + 1) / (1 - (m_min / m1) ** (beta_q + 1))
+    p_of_q = normalisation * q**beta_q
+
+    return np.where(out_bounds, -1e300, np.log(p_of_q))
+
+
 def chi_log_pdf(chi, mu_chi, var_chi):
     nu = mu_chi * (1 - mu_chi) / var_chi - 1.0
     alpha_chi = mu_chi * nu
@@ -22,7 +31,7 @@ def chi_log_pdf(chi, mu_chi, var_chi):
     return np.where(zero_mask, -1e300, stats.beta(a=alpha_chi, b=beta_chi).logpdf(chi))
 
 
-def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t):
+def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t=0):
     truncated_gaussian = stats.truncnorm(
         loc=mu_t, scale=sigma_t, a=(-1-mu_t) /sigma_t, b=(1-mu_t) /sigma_t
     )
@@ -54,14 +63,11 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
         log_Nxi = self.delaunay_interpolator._interpolate(inj_simplex, inj_b)
 
-        inj_inside = inj_simplex != -1
         maybe_infinity = np.exp(log_Nxi)
-
-        if np.isinf(inj_inside * maybe_infinity).any():
+        if np.isinf(maybe_infinity).any():
             return self.minus_infinity
-        maybe_infinity[
-                np.where(maybe_infinity > 1e300)
-                ] = 0 # injections outside the corner box are not used further out
+
+        inj_inside = inj_simplex != -1
 
         return (
             log_dNdtheta_samples,
@@ -71,7 +77,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
 
 
-class M1ZQDelaunay:
+class M1ZDelaunay:
 
     def __init__(
         self,
@@ -85,8 +91,8 @@ class M1ZQDelaunay:
         corners,
         minus_infinity=-1e300,
     ):
-        delaunay_indices = (0, 1, 2)
-        if len(delaunay_indices) != 3:
+        delaunay_indices = (0, 1)
+        if len(delaunay_indices) != 2:
             raise ValueError("Three is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
@@ -118,8 +124,11 @@ class M1ZQDelaunay:
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = population_parameters
+        (inner_tri_parameters, corner_weights, beta_q, mu_var_chi, zeta_sigma_t) = (
+            population_parameters
+        )
 
+        beta_q = beta_q.squeeze()
         mu_var_chi = mu_var_chi.squeeze()
         zeta_sigma_t = zeta_sigma_t.squeeze()
 
@@ -140,65 +149,63 @@ class M1ZQDelaunay:
         # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
         log_dNdtheta = (
             log_dNdtheta_tri
+            + q_log_prior(self.events[:, 2], self.events[:, 0], beta_q, m_min=self.corners[0,0])
             + chi_log_pdf(self.events[:, 3], mu_var_chi[0], mu_var_chi[1])
             + chi_log_pdf(self.events[:, 4], mu_var_chi[0], mu_var_chi[1])
             + tilts_log_pdf(
-                self.events[:, 5], 
-                self.events[:, 6], 
-                zeta_sigma_t[0], 
-                zeta_sigma_t[1], 
-                zeta_sigma_t[2],
+                self.events[:, 5], self.events[:, 6], 
+                zeta_sigma_t[0], zeta_sigma_t[1], 
                 )
         ).reshape(self.num_events, self.num_samples)
 
-        maybe_inf = np.exp(log_dNdtheta - self.events_log_prior)
-        if np.isinf(samples_inside_tri * maybe_inf).any():
-            return self.minus_infinity
-        maybe_inf[
-                np.where(np.isinf(maybe_inf))
-                ] = 0 # events outside the corner box are not used further out
+        to_integrate = log_dNdtheta - self.events_log_prior
+        log_bayes_factors = self.delaunay_rate.logsumexp(
+            to_integrate,  b=samples_inside_tri, axis=-1
+        )
 
-        #NL_j_to_sum = samples_inside_tri * np.exp(log_dNdtheta - self.events_log_prior)
-        NL_j_to_sum = samples_inside_tri * maybe_inf
-        NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
-        var_NL_j = (
-            (NL_j_to_sum**2).sum(axis=-1) / (self.num_samples - 1) - NL_j**2
-        ) / self.num_samples
-        var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
+        log_variance_likes = self.delaunay_rate.logsumexp(
+            2 * to_integrate, b=samples_inside_tri, axis=-1
+        )
+        if np.isnan(log_variance_likes).any():
+            logger.debug("Variances are bad")
+            return self.minus_infinity
+
+        log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
+        if ((log_effective_sample_sizes < np.log(self.num_events))).any():
+            logger.debug(f"Effective sample size is too low")
+            return self.minus_infinity
+
 
         Nxi_presum = Nxi_tri * np.exp(
-            chi_log_pdf(
+            + q_log_prior(
+                self.detected_injections[:, 2], self.detected_injections[:, 0], 
+                beta_q, m_min=self.corners[0,0],
+                )
+            + chi_log_pdf(
                 self.detected_injections[:, 3], 
                 mu_var_chi[0], mu_var_chi[1],
                 )
-            + chi_log_pdf(self.detected_injections[:, 4], 
+            + chi_log_pdf(
+                self.detected_injections[:, 4], 
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + tilts_log_pdf(
-                self.detected_injections[:, 5],
-                self.detected_injections[:, 6],
-                zeta_sigma_t[0],
-                zeta_sigma_t[1],
-                zeta_sigma_t[2],
+                self.detected_injections[:, 5], self.detected_injections[:, 6],
+                zeta_sigma_t[0], zeta_sigma_t[1],
             )
         )
 
         Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
-            (
-                self.num_events
-                #/ self.delaunay_rate.delaunay_interpolator.compute_events()
-                /Nxi
-            )
-            ** 2
-            * ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
+            ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
         )
 
-        if (var_log_NL + var_Nxi) > 10:
-            logger.debug(f"Variance in log-likelihood estimator exceeds 10")
+        if Nxi**2 /var_Nxi <= 4*self.num_events:
+            logger.debug("Not enough injection stuff")
             return self.minus_infinity
-
-        return (np.log(NL_j).sum() - Nxi).item()
+        
+        result = (log_bayes_factors - self.log_num_samples).sum() - Nxi
+        return result.item()
 

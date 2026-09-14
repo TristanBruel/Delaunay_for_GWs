@@ -24,7 +24,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, M1ZQDelaunay
+from likelihoods import SimpleDelaunay, M1ZDelaunay
 
 
 
@@ -36,7 +36,7 @@ def make_valid_delaunay(event_points, num_vertices, corners):
         ])
     inside_corners = np.sum(inside_corners,axis=0)==corners.shape[1]
     points = event_points[inside_corners]
-    dim = 3
+    dim = 2
     offset = 2**dim
     min_max = np.array([
         [np.min(points[:, i]), np.max(points[:, i])]
@@ -71,36 +71,35 @@ def set_priors(corners, w_min, w_max):
             1: uniform_dist(
                 corners[:, 1].min(), corners[:, 1].max()
                 ),
-            2: uniform_dist(
-                corners[:, 2].min(), corners[:, 2].max()
-                ),
-            3: uniform_dist(w_min, w_max),
+            2: uniform_dist(w_min, w_max),
         },
         "corner_w": {
             i: uniform_dist(w_min, w_max) for i in range(corners.shape[0])
+        },
+        "beta_q": {
+            0: uniform_dist(-2, 7),
         },
         "chi": {
             0: uniform_dist(0., 1.),
             1: uniform_dist(0.005, 1.),
         },
-        "cos_tilt": {
+        "tilt": {
             0: uniform_dist(0., 1.),
             1: uniform_dist(0.01, 4),
-            2: uniform_dist(-0.1, 0.1),
         }
     }
     return priors
 
 
 
-def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
+def define_moves(m1_min, m1_max, z_min, z_max,
                     nleaves_min, nleaves_max, priors):
     """
     Define moves for the sampling
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.1 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
+            sigma_vertices=0.1 * np.array([m1_max - m1_min, z_max - z_min]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -110,13 +109,14 @@ def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
     ]
     moves += [
         (StretchMove(
-            gibbs_sampling_setup=["corner_w", "chi", "cos_tilt"],
+            gibbs_sampling_setup=["corner_w", "beta_q", "chi", "tilt"],
             live_dangerously=True,
         ),
         0.2,)
     ]
+    moves += [(StretchMove(gibbs_sampling_setup=["beta_q"], live_dangerously=True), 0.3)]
     moves += [(StretchMove(gibbs_sampling_setup=["chi"], live_dangerously=True), 0.2)]
-    moves += [(StretchMove(gibbs_sampling_setup=["cos_tilt"],live_dangerously=True), 0.2)]
+    moves += [(StretchMove(gibbs_sampling_setup=["tilt"],live_dangerously=True), 0.2)]
     prior_move = DistributionGenerateRJ(
         {key: ProbDistContainer(priors[key]) for key in priors},
         nleaves_min={key: val for key, val in nleaves_min.items()},
@@ -154,42 +154,37 @@ if __name__ == "__main__":
     os.makedirs(f"{args.label}", exist_ok=True)
 
     # READ data and injections
-    parameter_keys = ["m1", "z", "q", "chi1", "chi2", "cos_tilt_1", "cos_tilt_2"]
-    data_file = np.load("./gwtc5_samples.npz")
+    parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
+    data_file = np.load("./lvc_data_lvc_samples_full.npz")
     observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
-    num_events = int(data_file["nevents"])
-    num_samples = int(data_file["nsamples"])
+    num_events = int(data_file["nevents"][0])
+    num_samples = int(data_file["nsamples"][0])
     print(
         f"Running with {num_events} events × {num_samples} samples = {num_events*num_samples} total samples"
     )
     barycenters = observed_events.reshape(num_events, num_samples, 7).mean(axis=1)
 
-    injections_file = np.load("./gwtc5_injections_full.npz")
+    injections_file = np.load("./selection_function_elements.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
     injection_priors = injections_file["inj_priors"]
-    num_injections = int(injections_file["ninjs"])
+    num_injections = int(injections_file["ninjs"][0])
+
 
     z_min = 1e-6
-    z_max = 2.
+    z_max = 1.5
     m1_min = 3.0
-    m1_max = 150.0 + 1e-6
-    q_min = 0.
-    q_max = 1.
+    m1_max = 100.0 + 1e-6
     corners = np.array([
-        [m1_min, z_min, q_min],
-        [m1_min, z_min, q_max],
-        [m1_min, z_max, q_min],
-        [m1_min, z_max, q_max],
-        [m1_max, z_min, q_min],
-        [m1_max, z_min, q_max],
-        [m1_max, z_max, q_min],
-        [m1_max, z_max, q_max],
+        [m1_min, z_min],
+        [m1_min, z_max],
+        [m1_max, z_min],
+        [m1_max, z_max],
     ])
 
-    log_like_fn = M1ZQDelaunay(
+    log_like_fn = M1ZDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,
@@ -200,10 +195,10 @@ if __name__ == "__main__":
         corners=corners,
     )
 
-    branch_names = ["tri", "corner_w", "chi", "cos_tilt"]
-    ndims = dict(zip(branch_names, [4, 8, 2, 3]))
-    nleaves_min = dict(zip(branch_names, [4, 1, 1, 1]))
-    nleaves_max = dict(zip(branch_names, [100, 1, 1, 1]))
+    branch_names = ["tri", "corner_w", "beta_q", "chi", "tilt"]
+    ndims = dict(zip(branch_names, [3, 4, 1, 2, 2]))
+    nleaves_min = dict(zip(branch_names, [4, 1, 1, 1, 1]))
+    nleaves_max = dict(zip(branch_names, [100, 1, 1, 1, 1]))
 
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)
@@ -241,15 +236,15 @@ if __name__ == "__main__":
             }
 
             start_time = time.time()
-            for attempt in range(10_000):
+            for attempt in range(20_000):
                 init_proposal = {
                     "tri": np.c_[
                         make_valid_delaunay(
-                            barycenters[:, :3],
+                            barycenters[:, :ndims['tri']-1],
                             start_with_this_many,
                             log_like_fn.corners,
                         ),
-                        priors["tri"][3].rvs(size=start_with_this_many),
+                        priors["tri"][ndims['tri']-1].rvs(size=start_with_this_many),
                     ]
                 } | {
                     branch: np.array(
@@ -430,7 +425,7 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, z_min, z_max, q_min, q_max,
+            m1_min, m1_max, z_min, z_max,
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

@@ -86,7 +86,7 @@ def set_priors(corners, w_min, w_max):
         "cos_tilt": {
             0: uniform_dist(0., 1.),
             1: uniform_dist(0.01, 4),
-            2: uniform_dist(-1, 1),
+            2: uniform_dist(-0.1, 0.1),
         }
     }
     return priors
@@ -136,11 +136,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Save dir
     parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='outdir0')
-    # Initial Delaunay
-    parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
-    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=15)
+    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
     parser.add_argument("--procs", dest='nprocs', help="Number of CPUs", type=int, default=8)
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=40)
@@ -150,7 +148,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
     nprocs, nwalkers, ntemps, nburn, nsteps = \
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
-    start_with_this_many = args.Nstart
     os.makedirs(f"{args.label}", exist_ok=True)
 
     # READ data and injections
@@ -208,45 +205,61 @@ if __name__ == "__main__":
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)
 
-    gwtc3_backend_file = '../gwtc3_z_m1_q/outdir0/backend'
-    print(f"Using triangulations from {gwtc3_backend_file=} to initiate")
-    with open(gwtc3_backend_file, "rb") as f:
-        last_backend = pickle.load(f)
-
-    coords = {}
-    inds = {}
-    for branch in branch_names:
-        coords[branch] = np.zeros(
-            (ntemps, nwalkers, nleaves_max[branch], ndims[branch])
-        )
-        inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
-    for t, w in product(range(ntemps), range(nwalkers)):
-        ind_max = np.argmax(last_backend.log_like[:,t,w])
-        for branch in branch_names[:-1]:
-            coords[branch][t, w] = last_backend.chain[branch][ind_max, t, w]
-            inds[branch][t, w] = last_backend.inds[branch][ind_max, t, w]
-        coords['cos_tilt'][t, w][0,:2] = last_backend.chain['tilt'][ind_max, t, w][:]
-        inds['cos_tilt'][t,w] = last_backend.inds['tilt'][ind_max, t, w]
-        #le_log = (
-        #        log_like_fn(
-        #            [
-        #                coords[branch][t, w][inds[branch][t, w]]
-        #                for branch in branch_names
-        #            ]
-        #        )
-        #        or -1e300
-        #    )
-        #if le_log > -1e300:
-        #        break
-    #print(t, w)
-    #print(le_log)
-
-    state = State(coords, inds=inds)
-
     backend_file = f"{args.label}/backend"
     state_0 = backend_file + "_state_0"
-    with open(state_0, "wb") as f:
-        pickle.dump(state, f)
+    if os.path.isfile(state_0):
+        print("Reusing state 0")
+        with open(state_0, "rb") as f:
+            state = pickle.load(f)
+    else:
+        gwtc3_backend_file = '../gwtc3_z_m1_q/outdir0/backend'
+        print(f"Using triangulations from {gwtc3_backend_file=} to initiate")
+        with open(gwtc3_backend_file, "rb") as f:
+            last_backend = pickle.load(f)
+            coords = {}
+            inds = {}
+            for branch in branch_names:
+                coords[branch] = np.zeros(
+                    (ntemps, nwalkers, nleaves_max[branch], ndims[branch])
+                )
+                inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
+            for t, w in product(range(ntemps), range(nwalkers)):
+                le_log = -np.inf
+                for i in np.argsort(last_backend.log_like[:,t,w])[::-1]:
+                    for branch in branch_names[:-1]:
+                        coords[branch][t, w] = last_backend.chain[branch][i, t, w]
+                        inds[branch][t, w] = last_backend.inds[branch][i, t, w]
+                    coords['cos_tilt'][t, w][0,:2] = last_backend.chain['tilt'][i, t, w][:]
+                    inds['cos_tilt'][t,w] = last_backend.inds['tilt'][i, t, w]
+                    le_log = (
+                            log_like_fn(
+                                [
+                                    coords[branch][t, w][inds[branch][t, w]]
+                                    for branch in branch_names
+                                ]
+                            )
+                            or -1e300
+                        )
+                    if le_log > -1e300:
+                        break
+                if le_log == -1e300:
+                    for branch in branch_names:
+                        coords[branch][t, w] = coords[branch][t, w-1]
+                        inds[branch][t, w] = inds[branch][t, w-1]
+                    le_log = (
+                            log_like_fn(
+                                [
+                                    coords[branch][t, w][inds[branch][t, w]]
+                                    for branch in branch_names
+                                ]
+                            )
+                            or -1e300
+                        )
+                print(t, w)
+                print(le_log)
+            state = State(coords, inds=inds)
+        with open(state_0, "wb") as f:
+            pickle.dump(state, f)
 
     # Define moves
     moves, rj_moves = define_moves(
