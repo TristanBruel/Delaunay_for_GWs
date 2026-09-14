@@ -2,7 +2,7 @@
 */*/__pycache__/
 trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
-gwtc*/outdir*/
+gwtc*/*/backend*
 gwtc*/*.npz
 mock_lvk_pop/datasets/*
 mock_lvk_pop/injections/*

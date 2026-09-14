@@ -139,6 +139,12 @@ if __name__ == "__main__":
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
+    parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
+    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
+    parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
+    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
+    parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
+    parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
     parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
@@ -172,12 +178,8 @@ if __name__ == "__main__":
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"])
 
-    z_min = 1e-6
-    z_max = 2.
-    m1_min = 3.0
-    m1_max = 150.0 + 1e-6
-    q_min = 0.
-    q_max = 1.
+    z_min, z_max, m1_min, m1_max, q_min, q_max = \
+            args.z_min, args.z_max, args.m1_min, args.m1_max, args.q_min, args.q_max
     corners = np.array([
         [m1_min, z_min, q_min],
         [m1_min, z_min, q_max],

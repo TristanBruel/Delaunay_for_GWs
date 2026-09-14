@@ -137,6 +137,12 @@ if __name__ == "__main__":
     # Save dir
     parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='outdir0')
     # Prior range
+    parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
+    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
+    parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
+    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
+    parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
+    parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
     parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
@@ -169,12 +175,8 @@ if __name__ == "__main__":
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"])
 
-    z_min = 1e-6
-    z_max = 2.
-    m1_min = 3.0
-    m1_max = 150.0 + 1e-6
-    q_min = 0.
-    q_max = 1.
+    z_min, z_max, m1_min, m1_max, q_min, q_max = \
+            args.z_min, args.z_max, args.m1_min, args.m1_max, args.q_min, args.q_max
     corners = np.array([
         [m1_min, z_min, q_min],
         [m1_min, z_min, q_max],
@@ -212,7 +214,7 @@ if __name__ == "__main__":
         with open(state_0, "rb") as f:
             state = pickle.load(f)
     else:
-        gwtc3_backend_file = '../gwtc3_z_m1_q/outdir0/backend'
+        gwtc3_backend_file = '../gwtc3_z_m1_q/small_box/backend'
         print(f"Using triangulations from {gwtc3_backend_file=} to initiate")
         with open(gwtc3_backend_file, "rb") as f:
             last_backend = pickle.load(f)
