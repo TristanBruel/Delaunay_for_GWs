@@ -139,9 +139,9 @@ if __name__ == "__main__":
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
     parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
-    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
+    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=100.0)
     parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
-    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
+    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=1.5)
     parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
     parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)

@@ -218,48 +218,75 @@ if __name__ == "__main__":
         print(f"Using triangulations from {gwtc3_backend_file=} to initiate")
         with open(gwtc3_backend_file, "rb") as f:
             last_backend = pickle.load(f)
-            coords = {}
-            inds = {}
-            for branch in branch_names:
-                coords[branch] = np.zeros(
-                    (ntemps, nwalkers, nleaves_max[branch], ndims[branch])
+        coords = {}
+        inds = {}
+        for branch in branch_names:
+            coords[branch] = np.zeros(
+                (ntemps, nwalkers, nleaves_max[branch], ndims[branch])
+            )
+            inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
+        """
+        for t, w in product(range(ntemps), range(nwalkers)):
+            le_log = -np.inf
+            for i in np.argsort(last_backend.log_like[:,t,w])[::-1]:
+                for branch in branch_names[:-1]:
+                    coords[branch][t, w] = last_backend.chain[branch][i, 0, w]
+                    inds[branch][t, w] = last_backend.inds[branch][i, 0, w]
+                coords['cos_tilt'][t, w][0,:2] = last_backend.chain['tilt'][i, 0, w][:]
+                #coords['cos_tilt'][t, w][0,2] = priors['cos_tilt'][2].rvs(1)[0]
+                inds['cos_tilt'][t,w] = last_backend.inds['tilt'][i, 0, w]
+                le_log = (
+                        log_like_fn(
+                            [
+                                coords[branch][t, w][inds[branch][t, w]]
+                                for branch in branch_names
+                            ]
+                        )
+                        or -1e300
+                    )
+                if le_log > -1e300:
+                    break
+            if le_log == -1e300:
+                for branch in branch_names:
+                    coords[branch][t, w] = coords[branch][t, w-1]
+                    inds[branch][t, w] = inds[branch][t, w-1]
+                le_log = (
+                        log_like_fn(
+                            [
+                                coords[branch][t, w][inds[branch][t, w]]
+                                for branch in branch_names
+                            ]
+                        )
+                        or -1e300
+                    )
+            print(t, w)
+            print(le_log)
+        """
+        le_log = -np.inf
+        for i in np.argsort(last_backend.log_like[:,0,0])[::-1]:
+            for branch in branch_names[:-1]:
+                coords[branch][0, 0] = last_backend.chain[branch][i, 0, 0]
+                inds[branch][0, 0] = last_backend.inds[branch][i, 0, 0]
+            coords['cos_tilt'][0, 0][0,:2] = last_backend.chain['tilt'][i, 0, 0][:]
+            inds['cos_tilt'][0, 0] = last_backend.inds['tilt'][i, 0, 0]
+            le_log = (
+                    log_like_fn(
+                        [
+                            coords[branch][0, 0][inds[branch][0, 0]]
+                            for branch in branch_names
+                        ]
+                    )
+                    or -1e300
                 )
-                inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
-            for t, w in product(range(ntemps), range(nwalkers)):
-                le_log = -np.inf
-                for i in np.argsort(last_backend.log_like[:,t,w])[::-1]:
-                    for branch in branch_names[:-1]:
-                        coords[branch][t, w] = last_backend.chain[branch][i, t, w]
-                        inds[branch][t, w] = last_backend.inds[branch][i, t, w]
-                    coords['cos_tilt'][t, w][0,:2] = last_backend.chain['tilt'][i, t, w][:]
-                    inds['cos_tilt'][t,w] = last_backend.inds['tilt'][i, t, w]
-                    le_log = (
-                            log_like_fn(
-                                [
-                                    coords[branch][t, w][inds[branch][t, w]]
-                                    for branch in branch_names
-                                ]
-                            )
-                            or -1e300
-                        )
-                    if le_log > -1e300:
-                        break
-                if le_log == -1e300:
-                    for branch in branch_names:
-                        coords[branch][t, w] = coords[branch][t, w-1]
-                        inds[branch][t, w] = inds[branch][t, w-1]
-                    le_log = (
-                            log_like_fn(
-                                [
-                                    coords[branch][t, w][inds[branch][t, w]]
-                                    for branch in branch_names
-                                ]
-                            )
-                            or -1e300
-                        )
-                print(t, w)
-                print(le_log)
-            state = State(coords, inds=inds)
+            if le_log > -1e300:
+                break
+        print(0, 0)
+        print(le_log)
+        for t, w in product(range(ntemps), range(nwalkers)):
+            for branch in branch_names:
+                coords[branch][t, w] = coords[branch][0, 0]
+                inds[branch][t, w] = inds[branch][0, 0]
+        state = State(coords, inds=inds)
         with open(state_0, "wb") as f:
             pickle.dump(state, f)
 

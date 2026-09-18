@@ -145,8 +145,8 @@ if __name__ == "__main__":
     parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
     parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
     parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
-    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
-    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
+    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-20)
+    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=15)
     # Sampling
     parser.add_argument("--procs", dest='nprocs', help="Number of CPUs", type=int, default=8)
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=40)
@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q", "chi1", "chi2", "cos_tilt_1", "cos_tilt_2"]
-    data_file = np.load("./gwtc5_samples.npz")
+    data_file = np.load("./gwtc4_samples.npz")
     observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
     num_events = int(data_file["nevents"])
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, 7).mean(axis=1)
 
-    injections_file = np.load("./gwtc5_injections_full.npz")
+    injections_file = np.load("./gwtc4_injections_full.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
