@@ -27,10 +27,14 @@ snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid], snrs_grid,
                                    )
 
 
+gwtc4 = '/common/tristan.bruel/LVK/gwtc4'
+filename = os.path.join(gwtc4,'data_release/BBHMassSpinRedshift_BrokenPowerLawTwoPeaks_GaussianComponentSpins_PowerLawRedshift.h5')
+result = PopulationResult(fname=filename)
+#gwtc5 = '/common/tristan.bruel/LVK/gwtc5'
+#filename = os.path.join(gwtc5, 'popsummary_files/gwtc5_updated_default_mmax_mass_TwoPeakBrokenPowerLawSmoothedMassDistribution_redshift_PowerLawRedshift_magnitude_iid_spin_magnitude_gaussian_tilt_iid_spin_orientation_popsummary_result.h5')
+#result = PopulationResult(fname=filename)
 #filename = "BBHMassSpinRedshift_BrokenPowerLawTwoPeaks_GaussianComponentSpins_PowerLawRedshift.h5"
 #result = PopulationResult(fname=filename)
-gwtc5 = '/home/tristan-bruel/Documents/Science/LVK/gwtc5'
-result = PopulationResult(fname=f'{gwtc5}/popsummary_files/gwtc5_updated_default_mmax_mass_TwoPeakBrokenPowerLawSmoothedMassDistribution_redshift_PowerLawRedshift_magnitude_iid_spin_magnitude_gaussian_tilt_iid_spin_orientation_popsummary_result.h5')
 
 
 hyper_samples=result.get_hyperparameter_samples(hyperparameters=['alpha_1', 'alpha_2' , 'break_mass', 'delta_m_1', 'lam_0', 'lam_1', 'lamb', 'mlow_1', 'mpp_1', 'sigpp_1' , 'mpp_2', 'sigpp_2', 'beta'])
@@ -43,7 +47,7 @@ params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
 params['m1_low']=hyper_samples[id_sample,7]
-params['m1_high']=300.
+params['m1_high']=200.
 params['mu_1']=hyper_samples[id_sample,8]
 params['sigma_1']=hyper_samples[id_sample,9] 
 params['mu_2'] = hyper_samples[id_sample,10] 
@@ -59,7 +63,7 @@ params['betaq']=4
 
 
 
-zmax=2.
+zmax=1.5
 
 settings={}
 

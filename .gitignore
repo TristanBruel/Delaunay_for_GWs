@@ -1,9 +1,10 @@
-*/__pycache__/
-*/*/__pycache__/
+__pycache__/
+bimodal_gaussian/*.txt
+bimodal_gaussian/backend*
 trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
-gwtc*/*/backend*
+gwtc*/*/*/backend*
 gwtc*/*.npz
 mock_lvk_pop/datasets/*
 mock_lvk_pop/injections/*
-mock_lvk_pop/test*/
+mock_lvk_pop/*/*/backend*
