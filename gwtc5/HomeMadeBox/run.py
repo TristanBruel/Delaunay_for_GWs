@@ -16,7 +16,7 @@ from astropy.cosmology import Planck15
 from astropy import units as u
 import numpy as np
 from scipy import special, stats
-from scipy.spatial import Delaunay
+from scipy.spatial import Delaunay, ConvexHull
 
 from eryn.ensemble import EnsembleSampler
 from eryn.moves import DistributionGenerateRJ, StretchMove, GaussianMove
@@ -58,6 +58,66 @@ def make_valid_delaunay(event_points, num_vertices, corners):
     return vertices[offset:]
 
 
+class PriorHomeMadeBox:
+
+    def __init__(self, corners):
+        self.corners = corners
+        self.m1_min = np.min(corners[:,0])
+        self.m1_max = np.max(corners[:,0])
+        self.z_min = np.min(corners[:,1])
+        self.z_max = np.max(corners[:,1])
+        self.q_min = np.min(corners[:,2])
+        self.q_max = np.max(corners[:,2])
+
+        self.delaunay = Delaunay(corners)
+        self.convex = ConvexHull(corners)
+        self.volume = self.convex.volume
+
+    def rvs_3d(self, size=1):
+        if not isinstance(size, int) and not isinstance(size, tuple):
+            raise ValueError("size must be an integer or tuple of ints.")
+        if isinstance(size, int):
+            size = (size,)
+
+        out = np.zeros((3,*size), dtype=np.float32).T
+        inside = np.zeros(size, dtype=np.bool).T
+        while np.sum(inside) < np.prod(np.shape(inside)):
+            rand = np.random.rand(3,*size)
+            m1s = self.m1_min + (self.m1_max-self.m1_min)*rand[0]
+            zs = self.z_min + (self.z_max-self.z_min)*rand[1]
+            qs = self.q_min + (self.q_max-self.q_min)*rand[2]
+            samples = np.array([m1s,zs,qs]).T
+            inbox = (self.delaunay.find_simplex(samples)) != -1
+            out[~inside&inbox] = samples[~inside&inbox]
+            inside[~inside&inbox] = inbox[~inside&inbox]
+
+        return out.T
+
+    def pdf(self, x):
+        x = x.reshape(-1)
+        if self.delaunay.find_simplex(x)==-1:
+            return 0
+        else:
+            return 1/self.volume
+
+    def logpdf(self, x):
+        return np.log(self.pdf(x))
+
+
+class HomeMadeM1(PriorHomeMadeBox):
+    def rvs(self, size):
+        return self.rvs_3d(size)[0,...]
+
+class HomeMadeZ(PriorHomeMadeBox):
+    def rvs(self, size):
+        return self.rvs_3d(size)[1,...]
+
+class HomeMadeQ(PriorHomeMadeBox):
+    def rvs(self, size):
+        return self.rvs_3d(size)[2,...]
+
+
+
 
 def set_priors(corners, w_min, w_max):
     """
@@ -65,15 +125,7 @@ def set_priors(corners, w_min, w_max):
     """
     priors = {
         "tri": {
-            0: uniform_dist(
-                corners[:, 0].min(), corners[:, 0].max()
-                ),
-            1: uniform_dist(
-                corners[:, 1].min(), corners[:, 1].max()
-                ),
-            2: uniform_dist(
-                corners[:, 2].min(), corners[:, 2].max()
-                ),
+            0: PriorHomeMadeBox(corners=corners),
             3: uniform_dist(w_min, w_max),
         },
         "corner_w": {
@@ -178,17 +230,15 @@ if __name__ == "__main__":
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"])
 
-    z_min, z_max, m1_min, m1_max, q_min, q_max = \
-            args.z_min, args.z_max, args.m1_min, args.m1_max, args.q_min, args.q_max
     corners = np.array([
-        [m1_min, z_min, q_min],
-        [m1_min, z_min, q_max],
-        [m1_min, z_max, q_min],
-        [m1_min, z_max, q_max],
-        [m1_max, z_min, q_min],
-        [m1_max, z_min, q_max],
-        [m1_max, z_max, q_min],
-        [m1_max, z_max, q_max],
+        [2., 1e-6, 0.1],
+        [2., 1e-6, 1.0],
+        [100, 2.0, 1.0],
+        [100, 2.0, 0.7],
+        [150, 2.0, 0.7],
+        [150, 1e-6, 0.1],
+        [150, 1e-6, 1.0],
+        [150, 2.0, 1.0],
     ])
 
     log_like_fn = M1ZQDelaunay(
