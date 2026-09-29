@@ -15,6 +15,14 @@ logging.basicConfig(
 )
 
 
+def q_log_pdf(q, m1, beta_q, m_min):
+    out_bounds = q * m1 < m_min
+
+    normalisation = (beta_q + 1) / (1 - (m_min / m1) ** (beta_q + 1))
+    p_of_q = normalisation * q**beta_q
+
+    return np.where(out_bounds, -1e300, np.log(p_of_q))
+
 
 def chi_log_pdf(chi, mu_chi, sigma_chi):
     return np.where(
@@ -75,7 +83,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
 
 
-class M1ZQDelaunay:
+class M1ZDelaunay:
 
     def __init__(
         self,
@@ -89,9 +97,9 @@ class M1ZQDelaunay:
         corners,
         minus_infinity=-1e300,
     ):
-        delaunay_indices = (0, 1, 2)
-        if len(delaunay_indices) != 3:
-            raise ValueError("Three is the number of dimensions I shall triangulate over")
+        delaunay_indices = (0, 1)
+        if len(delaunay_indices) != 2:
+            raise ValueError("Two is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
             events=events[:, delaunay_indices],
@@ -122,10 +130,11 @@ class M1ZQDelaunay:
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = (
+        (inner_tri_parameters, corner_weights, beta_q, mu_var_chi, zeta_sigma_t) = (
             population_parameters
         )
 
+        beta_q = beta_q.squeeze()
         mu_var_chi = mu_var_chi.squeeze()
         zeta_sigma_t = zeta_sigma_t.squeeze()
 
@@ -146,6 +155,10 @@ class M1ZQDelaunay:
         # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
         log_dNdtheta = (
             log_dNdtheta_tri
+            + q_log_pdf(
+                self.events[:,2], self.events[:,0],
+                beta_q, m_min=self.corners[0,0],
+                )
             + chi_log_pdf(
                 self.events[:,3],
                 mu_var_chi[0], mu_var_chi[1],

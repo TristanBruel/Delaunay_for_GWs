@@ -140,13 +140,13 @@ if __name__ == "__main__":
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
     parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
-    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
+    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=200.0)
     parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
     parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
     parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
     parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
-    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
-    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
+    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-20)
+    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=15)
     # Sampling
     parser.add_argument("--procs", dest='nprocs', help="Number of CPUs", type=int, default=8)
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=40)

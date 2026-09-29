@@ -14,7 +14,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-def q_log_prior(q, m1, beta_q, m_min):
+
+def q_log_pdf(q, m1, beta_q, m_min):
     out_bounds = q * m1 < m_min
 
     normalisation = (beta_q + 1) / (1 - (m_min / m1) ** (beta_q + 1))
@@ -75,7 +76,7 @@ class M1ZDelaunay:
     ):
         delaunay_indices = (0, 1)
         if len(delaunay_indices) != 2:
-            raise ValueError("Three is the number of dimensions I shall triangulate over")
+            raise ValueError("Two is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
             events=events[:, delaunay_indices],
@@ -129,7 +130,10 @@ class M1ZDelaunay:
         # parameter_keys = ["m1", "z", "q"]
         log_dNdtheta = (
             log_dNdtheta_tri
-            + q_log_prior(self.events[:, 2], self.events[:, 0], beta_q, m_min=self.corners[0,0])
+            + q_log_pdf(
+                self.events[:,2], self.events[:,0],
+                beta_q, m_min=self.corners[0,0],
+                )
         ).reshape(self.num_events, self.num_samples)
 
         if ((log_dNdtheta - self.events_log_prior)>709).any():
@@ -143,8 +147,8 @@ class M1ZDelaunay:
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
         Nxi_presum = Nxi_tri * np.exp(
-            + q_log_prior(
-                self.detected_injections[:, 2], self.detected_injections[:, 0], 
+            + q_log_pdf(
+                self.detected_injections[:,2], self.detected_injections[:,0],
                 beta_q, m_min=self.corners[0,0],
                 )
         )
@@ -154,7 +158,11 @@ class M1ZDelaunay:
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
-        )
+            )
+        var_Nxi *= (
+                self.num_events
+                / self.delaunay_rate.delaunay_interpolator.compute_events()
+                )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
         #if Nxi**2 /var_Nxi <= 4*self.num_events:
@@ -168,6 +176,5 @@ class M1ZDelaunay:
 
         # Correction for the likelihood (Heinzel & Vitale 2025)
         #NL_j = NL_j * np.exp(-var_Nxi/2)
-        
-        return (np.log(NL_j).sum() - Nxi).item()
 
+        return (np.log(NL_j).sum() - Nxi).item()
