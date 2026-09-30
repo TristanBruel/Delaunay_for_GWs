@@ -14,7 +14,8 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
 )
 
-def q_log_prior(q, m1, beta_q, m_min):
+
+def q_log_pdf(q, m1, beta_q, m_min):
     out_bounds = q * m1 < m_min
 
     normalisation = (beta_q + 1) / (1 - (m_min / m1) ** (beta_q + 1))
@@ -23,12 +24,23 @@ def q_log_prior(q, m1, beta_q, m_min):
     return np.where(out_bounds, -1e300, np.log(p_of_q))
 
 
-def chi_log_pdf(chi, mu_chi, var_chi):
-    nu = mu_chi * (1 - mu_chi) / var_chi - 1.0
-    alpha_chi = mu_chi * nu
-    beta_chi = (1 - mu_chi) * nu
-    zero_mask = np.logical_or(nu < 0, np.logical_or(alpha_chi < 0, beta_chi < 0))
-    return np.where(zero_mask, -1e300, stats.beta(a=alpha_chi, b=beta_chi).logpdf(chi))
+#def chi_log_pdf(chi, mu_chi, var_chi):
+#    nu = mu_chi * (1 - mu_chi) / var_chi - 1.0
+#    alpha_chi = mu_chi * nu
+#    beta_chi = (1 - mu_chi) * nu
+#    zero_mask = np.logical_or(nu < 0, np.logical_or(alpha_chi < 0, beta_chi < 0))
+#    return np.where(zero_mask, -1e300, stats.beta(a=alpha_chi, b=beta_chi).logpdf(chi))
+def chi_log_pdf(chi, mu_chi, sigma_chi):
+    return np.where(
+        (chi < 0) | (chi > 1),
+        -1e300,
+        stats.truncnorm(
+            loc=mu_chi,
+            scale=sigma_chi,
+            a=(0 - mu_chi) / sigma_chi,
+            b=(1 - mu_chi) / sigma_chi,
+        ).logpdf(chi),
+    )
 
 
 def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t=0):
@@ -39,6 +51,7 @@ def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t=0):
     return np.where(
         gauss_prod <= 0.0, -1e300, np.log(0.25 * (1 - zeta) + zeta * gauss_prod)
     )
+
 
 
 class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
@@ -63,16 +76,15 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
         log_Nxi = self.delaunay_interpolator._interpolate(inj_simplex, inj_b)
 
-        maybe_infinity = np.exp(log_Nxi)
-        if np.isinf(maybe_infinity).any():
-            return self.minus_infinity
-
         inj_inside = inj_simplex != -1
+
+        if (log_Nxi>709).any():
+            return self.minus_infinity
 
         return (
             log_dNdtheta_samples,
             samples_inside,
-            maybe_infinity,
+            log_Nxi,
             inj_inside,
         )
 
@@ -93,7 +105,7 @@ class M1ZDelaunay:
     ):
         delaunay_indices = (0, 1)
         if len(delaunay_indices) != 2:
-            raise ValueError("Three is the number of dimensions I shall triangulate over")
+            raise ValueError("Two is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
             events=events[:, delaunay_indices],
@@ -142,64 +154,58 @@ class M1ZDelaunay:
         (
             log_dNdtheta_tri,
             samples_inside_tri,
-            Nxi_tri,
+            log_Nxi_tri,
             inj_inside_tri,
         ) = tri_result
 
         # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
         log_dNdtheta = (
             log_dNdtheta_tri
-            + q_log_prior(
-                self.events[:, 2], self.events[:, 0], 
+            + q_log_pdf(
+                self.events[:,2], self.events[:,0],
                 beta_q, m_min=self.corners[0,0],
                 )
             + chi_log_pdf(
-                self.events[:, 3], 
+                self.events[:,3],
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + chi_log_pdf(
-                self.events[:, 4], 
+                self.events[:,4],
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + tilts_log_pdf(
-                self.events[:, 5], self.events[:, 6], 
+                self.events[:,5], self.events[:,6],
                 zeta_sigma_t[0], zeta_sigma_t[1], 
                 )
         ).reshape(self.num_events, self.num_samples)
 
         to_integrate = log_dNdtheta - self.events_log_prior
-        log_bayes_factors = self.delaunay_rate.logsumexp(
-            to_integrate,  b=samples_inside_tri, axis=-1
-        )
-
-        log_variance_likes = self.delaunay_rate.logsumexp(
-            2 * to_integrate, b=samples_inside_tri, axis=-1
-        )
-        if np.isnan(log_variance_likes).any():
-            logger.debug("Variances are bad")
+        if (to_integrate>709).any():
             return self.minus_infinity
 
-        log_effective_sample_sizes = 2 * log_bayes_factors - log_variance_likes
-        if ((log_effective_sample_sizes < np.log(self.num_events))).any():
-            logger.debug(f"Effective sample size is too low")
-            return self.minus_infinity
+        NL_j_to_sum = samples_inside_tri * np.exp(to_integrate)
+        NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
+        var_NL_j = (
+            (NL_j_to_sum**2).sum(axis=-1) / (self.num_samples - 1) - NL_j**2
+        ) / self.num_samples
+        var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-
-        Nxi_presum = Nxi_tri * np.exp(
-            + q_log_prior(
-                self.detected_injections[:, 2], self.detected_injections[:, 0], 
+        Nxi_presum = np.exp(
+            log_Nxi_tri
+            + q_log_pdf(
+                self.detected_injections[:,2], self.detected_injections[:,0],
                 beta_q, m_min=self.corners[0,0],
                 )
             + chi_log_pdf(
-                self.detected_injections[:, 3], 
+                self.detected_injections[:,3],
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + chi_log_pdf(
-                self.detected_injections[:, 4], 
+                self.detected_injections[:,4],
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + tilts_log_pdf(
-                self.detected_injections[:, 5], self.detected_injections[:, 6],
+                self.detected_injections[:,5], self.detected_injections[:,6],
                 zeta_sigma_t[0], zeta_sigma_t[1],
             )
         )
@@ -209,12 +215,23 @@ class M1ZDelaunay:
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
-        )
+            )
+        var_Nxi *= (
+                self.num_events
+                / self.delaunay_rate.delaunay_interpolator.compute_events()
+                )** 2
 
-        if Nxi**2 /var_Nxi <= 4*self.num_events:
-            logger.debug("Not enough injection stuff")
+        ## Threshold on effective sample size (GWTC-3) ##
+        #if Nxi**2 /var_Nxi <= 4*self.num_events:
+        #    logger.debug("Not enough injection stuff")
+        #    return self.minus_infinity
+
+        ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
+        if (var_log_NL + var_Nxi) > 1:
+            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
             return self.minus_infinity
-        
-        result = (log_bayes_factors - self.log_num_samples).sum() - Nxi
-        return result.item()
 
+        # Correction for the likelihood (Heinzel & Vitale 2025)
+        #NL_j = NL_j * np.exp(-var_Nxi/2)
+
+        return (np.log(NL_j).sum() - Nxi).item()

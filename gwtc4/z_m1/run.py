@@ -176,9 +176,12 @@ if __name__ == "__main__":
     ).T
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"])
+    print(
+        f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
+    )
 
     z_min, z_max, m1_min, m1_max = \
-            args.z_min, args.z_max, args.m1_min, args.m1_max 
+            args.z_min, args.z_max, args.m1_min, args.m1_max
     corners = np.array([
         [m1_min, z_min],
         [m1_min, z_max],

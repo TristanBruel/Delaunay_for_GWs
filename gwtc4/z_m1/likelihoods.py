@@ -74,13 +74,12 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
 
         if (log_Nxi[inj_inside]>709).any():
             return self.minus_infinity
-
-        log_Nxi[np.where(log_Nxi>709)] = -np.inf
+        log_Nxi[log_Nxi>709] = -np.inf
 
         return (
             log_dNdtheta_samples,
             samples_inside,
-            np.exp(log_Nxi),
+            log_Nxi,
             inj_inside,
         )
 
@@ -150,7 +149,7 @@ class M1ZDelaunay:
         (
             log_dNdtheta_tri,
             samples_inside_tri,
-            Nxi_tri,
+            log_Nxi_tri,
             inj_inside_tri,
         ) = tri_result
 
@@ -175,10 +174,10 @@ class M1ZDelaunay:
                 )
         ).reshape(self.num_events, self.num_samples)
 
-        to_integrate = (log_dNdtheta - self.events_log_prior)
+        to_integrate = log_dNdtheta - self.events_log_prior
         if (to_integrate[samples_inside_tri]>709).any():
             return self.minus_infinity
-        to_integrate[np.where(to_integrate>709)] = -np.inf
+        to_integrate[to_integrate>709] = -np.inf
 
         NL_j_to_sum = samples_inside_tri * np.exp(to_integrate)
         NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
@@ -187,8 +186,13 @@ class M1ZDelaunay:
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-        Nxi_presum = Nxi_tri * np.exp(
-            chi_log_pdf(
+        Nxi_presum = np.exp(
+            log_Nxi_tri
+            + q_log_pdf(
+                self.detected_injections[:,2], self.detected_injections[:,0],
+                beta_q, m_min=self.corners[0,0],
+                )
+            + chi_log_pdf(
                 self.detected_injections[:,3],
                 mu_var_chi[0], mu_var_chi[1],
                 )

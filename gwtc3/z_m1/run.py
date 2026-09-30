@@ -99,7 +99,7 @@ def define_moves(m1_min, m1_max, z_min, z_max,
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.1 * np.array([m1_max - m1_min, z_max - z_min]),
+            sigma_vertices=0.05 * np.array([m1_max - m1_min, z_max - z_min]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -143,8 +143,8 @@ if __name__ == "__main__":
     parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
     parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
     parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=1.5)
-    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
-    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
+    parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-20)
+    parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=15)
     # Sampling
     parser.add_argument("--procs", dest='nprocs', help="Number of CPUs", type=int, default=8)
     parser.add_argument("--walkers", dest='nwalkers', help="Number of walkers", type=int, default=40)
@@ -175,10 +175,13 @@ if __name__ == "__main__":
     ).T
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"][0])
+    print(
+        f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
+    )
 
 
-    z_min, z_max, m1_min, m1_max, q_min, q_max = \
-            args.z_min, args.z_max, args.m1_min, args.m1_max, args.q_min, args.q_max
+    z_min, z_max, m1_min, m1_max = \
+            args.z_min, args.z_max, args.m1_min, args.m1_max
     corners = np.array([
         [m1_min, z_min],
         [m1_min, z_max],
@@ -238,11 +241,11 @@ if __name__ == "__main__":
             }
 
             start_time = time.time()
-            for attempt in range(20_000):
+            for attempt in range(10_000):
                 init_proposal = {
                     "tri": np.c_[
                         make_valid_delaunay(
-                            barycenters[:, :ndims['tri']-1],
+                            barycenters[:, :(ndims['tri']-1)],
                             start_with_this_many,
                             log_like_fn.corners,
                         ),
@@ -288,6 +291,7 @@ if __name__ == "__main__":
                         # For other branches, reshape if needed
                         branch_data = np.atleast_1d(init_proposal[branch])
                         result_coords[branch][: len(branch_data)] = branch_data
+            print(t, w, le_log)
             return t, w, result_coords, le_log, attempt + 1, elapsed
 
         def run_parallel(n_jobs=-1):

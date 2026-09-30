@@ -65,8 +65,9 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
 
         inj_inside = inj_simplex != -1
 
-        if (log_Nxi>709).any():
+        if (log_Nxi[inj_inside]>709).any():
             return self.minus_infinity
+        log_Nxi[log_Nxi>709] = -np.inf
 
         return (
             log_dNdtheta_samples,
@@ -159,10 +160,12 @@ class M1ZQDelaunay:
                 )
         ).reshape(self.num_events, self.num_samples)
 
-        if ((log_dNdtheta - self.events_log_prior)>709).any():
+        to_integrate = log_dNdtheta - self.events_log_prior
+        if (to_integrate[samples_inside_tri]>709).any():
             return self.minus_infinity
+        to_integrate[to_integrate>709] = -np.inf
 
-        NL_j_to_sum = samples_inside_tri * np.exp(log_dNdtheta - self.events_log_prior)
+        NL_j_to_sum = samples_inside_tri * np.exp(to_integrate)
         NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
         var_NL_j = (
             (NL_j_to_sum**2).sum(axis=-1) / (self.num_samples - 1) - NL_j**2
