@@ -16,7 +16,7 @@ logging.basicConfig(
 
 
 
-def chi_log_prior(chi, mu_chi, sigma_chi):
+def chi_log_pdf(chi, mu_chi, sigma_chi):
     return np.where(
         (chi < 0) | (chi > 1),
         -1e300,
@@ -71,7 +71,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         return (
             log_dNdtheta_samples,
             samples_inside,
-            np.exp(log_Nxi),
+            log_Nxi,
             inj_inside,
         )
 
@@ -138,21 +138,24 @@ class M1ZQDelaunay:
         (
             log_dNdtheta_tri,
             samples_inside_tri,
-            Nxi_tri,
+            log_Nxi_tri,
             inj_inside_tri,
         ) = tri_result
 
         # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
         log_dNdtheta = (
             log_dNdtheta_tri
-            + chi_log_prior(self.events[:, 3], mu_var_chi[0], mu_var_chi[1])
-            + chi_log_prior(self.events[:, 4], mu_var_chi[0], mu_var_chi[1])
+            + chi_log_pdf(
+                self.events[:,3],
+                mu_var_chi[0], mu_var_chi[1],
+                )
+            + chi_log_pdf(
+                self.events[:,4],
+                mu_var_chi[0], mu_var_chi[1],
+                )
             + tilts_log_pdf(
-                self.events[:, 5], 
-                self.events[:, 6], 
-                zeta_sigma_t[0], 
-                zeta_sigma_t[1], 
-                zeta_sigma_t[2],
+                self.events[:,5], self.events[:,6],
+                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
                 )
         ).reshape(self.num_events, self.num_samples)
 
@@ -166,42 +169,44 @@ class M1ZQDelaunay:
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-        Nxi_presum = Nxi_tri * np.exp(
-            chi_log_prior(
-                self.detected_injections[:, 3], 
+        Nxi_presum = np.exp(
+            log_Nxi_tri
+            + chi_log_pdf(
+                self.detected_injections[:,3],
                 mu_var_chi[0], mu_var_chi[1],
                 )
-            + chi_log_prior(self.detected_injections[:, 4], 
+            + chi_log_pdf(
+                self.detected_injections[:,4],
                 mu_var_chi[0], mu_var_chi[1],
                 )
             + tilts_log_pdf(
-                self.detected_injections[:, 5],
-                self.detected_injections[:, 6],
-                zeta_sigma_t[0],
-                zeta_sigma_t[1],
-                zeta_sigma_t[2],
+                self.detected_injections[:,5], self.detected_injections[:,6],
+                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
             )
         )
 
         Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
         Nxi = Nxi_to_sum.sum() / self.num_injections
-        #var_Nxi = (
-        #    ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
-        #    / self.num_injections
-        #    )
+        var_Nxi = (
+            ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
+            / self.num_injections
+            )
+        var_Nxi *= (
+                self.num_events
+                / self.delaunay_rate.delaunay_interpolator.compute_events()
+                )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
         #if Nxi**2 /var_Nxi <= 4*self.num_events:
         #    logger.debug("Not enough injection stuff")
         #    return self.minus_infinity
-        
+
         ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
-        #if (var_log_NL + var_Nxi) > 1:
-        #    logger.debug(f"Variance in log-likelihood estimator exceeds 1")
-        #    return self.minus_infinity
+        if (var_log_NL + var_Nxi) > 1:
+            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
+            return self.minus_infinity
 
         # Correction for the likelihood (Heinzel & Vitale 2025)
         #NL_j = NL_j * np.exp(-var_Nxi/2)
 
         return (np.log(NL_j).sum() - Nxi).item()
-

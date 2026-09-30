@@ -30,11 +30,8 @@ from likelihoods import SimpleDelaunay, M1ZQDelaunay
 
 
 def make_valid_delaunay(event_points, num_vertices, corners):
-    inside_corners = np.array([
-        (event_points[:,i]>np.min(corners[:,i]))&(event_points[:,i]<np.max(corners[:,i]))
-        for i in range(corners.shape[1])
-        ])
-    inside_corners = np.sum(inside_corners,axis=0)==corners.shape[1]
+    delaunay = Delaunay(corners)
+    inside_corners = delaunay.find_simplex(event_points)!=-1
     points = event_points[inside_corners]
     dim = 3
     offset = 2**dim
@@ -50,8 +47,9 @@ def make_valid_delaunay(event_points, num_vertices, corners):
         vertices[valid_vertices + offset, :] = np.random.uniform(
             low=min_max[:, 0], high=min_max[:, 1]
         )
-        this_tri = Delaunay(vertices[: offset + 1 + valid_vertices])
-        points_simplex = this_tri.find_simplex(points)
+        #this_tri = Delaunay(vertices[: offset + 1 + valid_vertices])
+        #points_simplex = this_tri.find_simplex(points)
+        points_simplex = delaunay.find_simplex(vertices[: offset + 1 + valid_vertices])
         #event_simplex = points_simplex[: event_points.shape[0]]
         if (points_simplex != -1).all():
             valid_vertices += 1
@@ -59,7 +57,6 @@ def make_valid_delaunay(event_points, num_vertices, corners):
 
 
 class PriorHomeMadeBox:
-
     def __init__(self, corners):
         self.corners = corners
         self.m1_min = np.min(corners[:,0])
@@ -68,54 +65,34 @@ class PriorHomeMadeBox:
         self.z_max = np.max(corners[:,1])
         self.q_min = np.min(corners[:,2])
         self.q_max = np.max(corners[:,2])
-
         self.delaunay = Delaunay(corners)
         self.convex = ConvexHull(corners)
         self.volume = self.convex.volume
 
-    def rvs_3d(self, size=1):
+    def rvs(self, size=1):
         if not isinstance(size, int) and not isinstance(size, tuple):
             raise ValueError("size must be an integer or tuple of ints.")
         if isinstance(size, int):
             size = (size,)
-
-        out = np.zeros((3,*size), dtype=np.float32).T
-        inside = np.zeros(size, dtype=np.bool).T
+        out = np.zeros((*size,3), dtype=np.float32)
+        inside = np.zeros(size, dtype=np.bool)
         while np.sum(inside) < np.prod(np.shape(inside)):
-            rand = np.random.rand(3,*size)
-            m1s = self.m1_min + (self.m1_max-self.m1_min)*rand[0]
-            zs = self.z_min + (self.z_max-self.z_min)*rand[1]
-            qs = self.q_min + (self.q_max-self.q_min)*rand[2]
-            samples = np.array([m1s,zs,qs]).T
+            rand = np.random.rand(*size,3)
+            m1s = self.m1_min + (self.m1_max-self.m1_min)*rand[...,0]
+            zs = self.z_min + (self.z_max-self.z_min)*rand[...,1]
+            qs = self.q_min + (self.q_max-self.q_min)*rand[...,2]
+            samples = np.stack((m1s,zs,qs), axis=-1)
             inbox = (self.delaunay.find_simplex(samples)) != -1
             out[~inside&inbox] = samples[~inside&inbox]
             inside[~inside&inbox] = inbox[~inside&inbox]
-
-        return out.T
+        return out
 
     def pdf(self, x):
-        x = x.reshape(-1)
-        if self.delaunay.find_simplex(x)==-1:
-            return 0
-        else:
-            return 1/self.volume
+        outside = self.delaunay.find_simplex(x)==-1
+        return np.where(outside, 0, 1/self.volume)
 
     def logpdf(self, x):
         return np.log(self.pdf(x))
-
-
-class HomeMadeM1(PriorHomeMadeBox):
-    def rvs(self, size):
-        return self.rvs_3d(size)[0,...]
-
-class HomeMadeZ(PriorHomeMadeBox):
-    def rvs(self, size):
-        return self.rvs_3d(size)[1,...]
-
-class HomeMadeQ(PriorHomeMadeBox):
-    def rvs(self, size):
-        return self.rvs_3d(size)[2,...]
-
 
 
 
@@ -191,12 +168,6 @@ if __name__ == "__main__":
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
-    parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
-    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
-    parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
-    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=2.0)
-    parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
-    parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-10)
     parser.add_argument("--wmax", dest='w_max', help="Upper range of the uniform distribution for the weights of vertices", type=int, default=10)
     # Sampling
@@ -229,6 +200,9 @@ if __name__ == "__main__":
     ).T
     injection_priors = injections_file["inj_priors"]
     num_injections = int(injections_file["ninjs"])
+    print(
+        f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
+    )
 
     corners = np.array([
         [2., 1e-6, 0.1],
@@ -273,14 +247,20 @@ if __name__ == "__main__":
             )
             inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
 
-            for i in range(ndims[branch]):
-                coords[branch][..., i] = priors[branch][i].rvs(
+            if branch=="tri":
+                coords[branch][..., :-1] = priors[branch][0].rvs(
+                    size=(ntemps, nwalkers, nleaves_max[branch])
+                )
+                inds["tri"][:, :, :start_with_this_many] = True
+                coords[branch][..., -1] = priors[branch][ndims['tri']-1].rvs(
                     size=(ntemps, nwalkers, nleaves_max[branch])
                 )
 
-            if branch == "tri":
-                inds["tri"][:, :, :start_with_this_many] = True
             else:
+                for i in range(ndims[branch]):
+                    coords[branch][..., i] = priors[branch][i].rvs(
+                        size=(ntemps, nwalkers, nleaves_max[branch])
+                    )
                 inds[branch][:, :, :] = True
 
         from joblib import Parallel, delayed
@@ -366,14 +346,21 @@ if __name__ == "__main__":
                 )
                 inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
 
-                for i in range(ndims[branch]):
-                    coords[branch][..., i] = priors[branch][i].rvs(
+                if branch=="tri":
+                    coords[branch][..., :-1] = priors[branch][0].rvs(
+                        size=(ntemps, nwalkers, nleaves_max[branch])
+                    )
+                    inds["tri"][:, :, :start_with_this_many] = True
+                    coords[branch][..., -1] = priors[branch][ndims['tri']-1].rvs(
                         size=(ntemps, nwalkers, nleaves_max[branch])
                     )
 
-                inds[branch][:, :, :] = True if branch != "tri" else False
-                if branch == "tri":
-                    inds["tri"][:, :, :start_with_this_many] = True
+                else:
+                    for i in range(ndims[branch]):
+                        coords[branch][..., i] = priors[branch][i].rvs(
+                            size=(ntemps, nwalkers, nleaves_max[branch])
+                        )
+                    inds[branch][:, :, :] = True
 
             # Create task list
             task_list = list(product(range(ntemps), range(nwalkers)))
