@@ -1,0 +1,2 @@
+test_3d/*.npz
+test_3d/*/backend*
