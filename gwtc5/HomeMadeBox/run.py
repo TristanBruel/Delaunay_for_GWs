@@ -103,7 +103,7 @@ def set_priors(corners, w_min, w_max):
     priors = {
         "tri": {
             0: PriorHomeMadeBox(corners=corners),
-            3: uniform_dist(w_min, w_max),
+            1: uniform_dist(w_min, w_max),
         },
         "corner_w": {
             i: uniform_dist(w_min, w_max) for i in range(corners.shape[0])
@@ -129,7 +129,7 @@ def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.1 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
+            sigma_vertices=0.05 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -252,7 +252,7 @@ if __name__ == "__main__":
                     size=(ntemps, nwalkers, nleaves_max[branch])
                 )
                 inds["tri"][:, :, :start_with_this_many] = True
-                coords[branch][..., -1] = priors[branch][ndims['tri']-1].rvs(
+                coords[branch][..., -1] = priors[branch][1].rvs(
                     size=(ntemps, nwalkers, nleaves_max[branch])
                 )
 
@@ -281,7 +281,7 @@ if __name__ == "__main__":
                             start_with_this_many,
                             log_like_fn.corners,
                         ),
-                        priors["tri"][ndims['tri']-1].rvs(size=start_with_this_many),
+                        priors["tri"][1].rvs(size=start_with_this_many),
                     ]
                 } | {
                     branch: np.array(
@@ -351,7 +351,7 @@ if __name__ == "__main__":
                         size=(ntemps, nwalkers, nleaves_max[branch])
                     )
                     inds["tri"][:, :, :start_with_this_many] = True
-                    coords[branch][..., -1] = priors[branch][ndims['tri']-1].rvs(
+                    coords[branch][..., -1] = priors[branch][1].rvs(
                         size=(ntemps, nwalkers, nleaves_max[branch])
                     )
 
@@ -470,7 +470,9 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, z_min, z_max, q_min, q_max,
+            np.min(corners[:,0]), np.max(corners[:,0]), 
+            np.min(corners[:,1]), np.max(corners[:,1]),
+            np.min(corners[:,2]), np.max(corners[:,2]),
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

@@ -40,7 +40,6 @@ def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t):
 
 
 
-
 class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
 
     def rate(self, triangulation_params):
@@ -65,9 +64,8 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
 
         inj_inside = inj_simplex != -1
 
-        if (log_Nxi[inj_inside]>709).any():
+        if (log_Nxi>709).any():
             return self.minus_infinity
-        log_Nxi[log_Nxi>709] = -np.inf
 
         return (
             log_dNdtheta_samples,
@@ -124,7 +122,9 @@ class M1ZQDelaunay:
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = population_parameters
+        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = (
+            population_parameters
+        )
 
         mu_var_chi = mu_var_chi.squeeze()
         zeta_sigma_t = zeta_sigma_t.squeeze()
@@ -161,9 +161,8 @@ class M1ZQDelaunay:
         ).reshape(self.num_events, self.num_samples)
 
         to_integrate = log_dNdtheta - self.events_log_prior
-        if (to_integrate[samples_inside_tri]>709).any():
+        if (to_integrate>709).any():
             return self.minus_infinity
-        to_integrate[to_integrate>709] = -np.inf
 
         NL_j_to_sum = samples_inside_tri * np.exp(to_integrate)
         NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
@@ -194,20 +193,20 @@ class M1ZQDelaunay:
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
             )
-        var_Nxi *= (
-                self.num_events
-                / self.delaunay_rate.delaunay_interpolator.compute_events()
-                )** 2
+        #var_Nxi *= (
+        #        self.num_events
+        #        / self.delaunay_rate.delaunay_interpolator.compute_events()
+        #        )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
-        #if Nxi**2 /var_Nxi <= 4*self.num_events:
-        #    logger.debug("Not enough injection stuff")
-        #    return self.minus_infinity
+        if Nxi**2 /var_Nxi <= 4*self.num_events:
+            logger.debug("Not enough injection stuff")
+            return self.minus_infinity
 
         ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
-        if (var_log_NL + var_Nxi) > 1:
-            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
-            return self.minus_infinity
+        #if (var_log_NL + var_Nxi) > 1:
+        #    logger.debug(f"Variance in log-likelihood estimator exceeds 1")
+        #    return self.minus_infinity
 
         # Correction for the likelihood (Heinzel & Vitale 2025)
         #NL_j = NL_j * np.exp(-var_Nxi/2)
