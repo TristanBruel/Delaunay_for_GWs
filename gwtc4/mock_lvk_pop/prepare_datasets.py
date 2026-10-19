@@ -372,7 +372,7 @@ for seed in seeds:
           
         priors/=kde_theta.evaluate(theta_obs)
 
-        priors*=q_obs*(chirpmz_obs/(m1z_obs*m2z_obs))*(1+z_obs)**2
+        priors*=q_obs*(chirpmz_obs/(m1z_obs*m2z_obs))*(1+z_obs)**2 # p(Mc,q,z) -> p(m1,m2,z)
 
         priors *= m1z_obs /(1+z_obs) # p(m1,m2,z) -> p(m1,q,z)
         
