@@ -79,15 +79,6 @@ def set_priors(corners, w_min, w_max):
         "corner_w": {
             i: uniform_dist(w_min, w_max) for i in range(corners.shape[0])
         },
-        "chi": {
-            0: uniform_dist(0., 1.),
-            1: uniform_dist(0.005, 1.),
-        },
-        "cos_tilt": {
-            0: uniform_dist(0., 1.),
-            1: uniform_dist(0.01, 4),
-            2: uniform_dist(-0.1, 0.1),
-        }
     }
     return priors
 
@@ -110,13 +101,11 @@ def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
     ]
     moves += [
         (StretchMove(
-            gibbs_sampling_setup=["corner_w", "chi", "cos_tilt"],
+            gibbs_sampling_setup=["corner_w"],
             live_dangerously=True,
         ),
         0.2,)
     ]
-    moves += [(StretchMove(gibbs_sampling_setup=["chi"], live_dangerously=True), 0.2)]
-    moves += [(StretchMove(gibbs_sampling_setup=["cos_tilt"],live_dangerously=True), 0.2)]
     prior_move = DistributionGenerateRJ(
         {key: ProbDistContainer(priors[key]) for key in priors},
         nleaves_min={key: val for key, val in nleaves_min.items()},
@@ -161,7 +150,7 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q"]
-    filename = '../datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_1.5_seed_1.npz'
+    filename = './datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_1.5_seed_1.npz'
     data_file = np.load(filename)
     observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
@@ -172,7 +161,7 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, 3).mean(axis=1)
 
-    injections_file = np.load("../injections/injections.npz")
+    injections_file = np.load("./injections/injections.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s_inj"] for key in parameter_keys]
     ).T
@@ -206,10 +195,10 @@ if __name__ == "__main__":
         corners=corners,
     )
 
-    branch_names = ["tri", "corner_w", "chi", "cos_tilt"]
-    ndims = dict(zip(branch_names, [4, 8, 2, 3]))
-    nleaves_min = dict(zip(branch_names, [4, 1, 1, 1]))
-    nleaves_max = dict(zip(branch_names, [100, 1, 1, 1]))
+    branch_names = ["tri", "corner_w"]
+    ndims = dict(zip(branch_names, [4, 8]))
+    nleaves_min = dict(zip(branch_names, [4, 1]))
+    nleaves_max = dict(zip(branch_names, [100, 1]))
 
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)

@@ -16,29 +16,6 @@ logging.basicConfig(
 
 
 
-def chi_log_pdf(chi, mu_chi, sigma_chi):
-    return np.where(
-        (chi < 0) | (chi > 1),
-        -1e300,
-        stats.truncnorm(
-            loc=mu_chi,
-            scale=sigma_chi,
-            a=(0 - mu_chi) / sigma_chi,
-            b=(1 - mu_chi) / sigma_chi,
-        ).logpdf(chi),
-    )
-
-
-def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t):
-    truncated_gaussian = stats.truncnorm(
-        loc=mu_t, scale=sigma_t, a=(-1-mu_t) /sigma_t, b=(1-mu_t) /sigma_t
-    )
-    gauss_prod = truncated_gaussian.pdf(tilt_1) * truncated_gaussian.pdf(tilt_2)
-    return np.where(
-        gauss_prod <= 0.0, -1e300, np.log(0.25 * (1 - zeta) + zeta * gauss_prod)
-    )
-
-
 
 class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
 
@@ -122,12 +99,9 @@ class M1ZQDelaunay:
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = (
+        (inner_tri_parameters, corner_weights) = (
             population_parameters
         )
-
-        mu_var_chi = mu_var_chi.squeeze()
-        zeta_sigma_t = zeta_sigma_t.squeeze()
 
         triangulation_parameters = np.vstack([
             inner_tri_parameters,
@@ -143,21 +117,9 @@ class M1ZQDelaunay:
             inj_inside_tri,
         ) = tri_result
 
-        # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
+        # parameter_keys = ["m1", "z", "q"]
         log_dNdtheta = (
             log_dNdtheta_tri
-            + chi_log_pdf(
-                self.events[:,3],
-                mu_var_chi[0], mu_var_chi[1],
-                )
-            + chi_log_pdf(
-                self.events[:,4],
-                mu_var_chi[0], mu_var_chi[1],
-                )
-            + tilts_log_pdf(
-                self.events[:,5], self.events[:,6],
-                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
-                )
         ).reshape(self.num_events, self.num_samples)
 
         to_integrate = log_dNdtheta - self.events_log_prior
@@ -173,18 +135,6 @@ class M1ZQDelaunay:
 
         Nxi_presum = np.exp(
             log_Nxi_tri
-            + chi_log_pdf(
-                self.detected_injections[:,3],
-                mu_var_chi[0], mu_var_chi[1],
-                )
-            + chi_log_pdf(
-                self.detected_injections[:,4],
-                mu_var_chi[0], mu_var_chi[1],
-                )
-            + tilts_log_pdf(
-                self.detected_injections[:,5], self.detected_injections[:,6],
-                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
-            )
         )
 
         Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
