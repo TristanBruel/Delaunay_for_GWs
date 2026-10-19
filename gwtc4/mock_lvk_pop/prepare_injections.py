@@ -133,7 +133,8 @@ pdf_q=utils.pdf_q_no_gap(qs_inj,m1s_inj,params['m1_low'],params['betaq'])
 
 
 
-priors_inj=pdf_m1*pdf_z*pdf_q/m1s_inj
+#priors_inj=pdf_m1*pdf_z*pdf_q/m1s_inj
+priors_inj=pdf_m1*pdf_z*pdf_q # p(m1,q,z)
 
 
 if not os.path.exists('injections/'):
@@ -141,6 +142,6 @@ if not os.path.exists('injections/'):
 name_file_injections='injections/injections'
 
 
-np.savez(name_file_injections+'.npz',m1s_inj=m1s_inj,m2s_inj=m1s_inj*qs_inj,zs_inj=zs_inj,priors_inj=priors_inj,ninj=ninj)
+np.savez(name_file_injections+'.npz',m1s_inj=m1s_inj,qs_inj=qs_inj,zs_inj=zs_inj,priors_inj=priors_inj,ninj=ninj)
 
 breakpoint()

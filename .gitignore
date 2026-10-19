@@ -5,6 +5,6 @@ trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
 gwtc*/*/*/backend*
 gwtc*/*/*.npz
-mock_lvk_pop/datasets/*
-mock_lvk_pop/injections/*
-mock_lvk_pop/*/*/backend*
+gwtc4/mock_lvk_pop/datasets/*
+gwtc4/mock_lvk_pop/injections/*
+gwtc4/mock_lvk_pop/*/backend*

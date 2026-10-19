@@ -15,13 +15,28 @@ logging.basicConfig(
 )
 
 
-def q_log_pdf(q, m1, beta_q, m_min):
-    out_bounds = q * m1 < m_min
 
-    normalisation = (beta_q + 1) / (1 - (m_min / m1) ** (beta_q + 1))
-    p_of_q = normalisation * q**beta_q
+def chi_log_pdf(chi, mu_chi, sigma_chi):
+    return np.where(
+        (chi < 0) | (chi > 1),
+        -1e300,
+        stats.truncnorm(
+            loc=mu_chi,
+            scale=sigma_chi,
+            a=(0 - mu_chi) / sigma_chi,
+            b=(1 - mu_chi) / sigma_chi,
+        ).logpdf(chi),
+    )
 
-    return np.where(out_bounds, -1e300, np.log(p_of_q))
+
+def tilts_log_pdf(tilt_1, tilt_2, zeta, sigma_t, mu_t):
+    truncated_gaussian = stats.truncnorm(
+        loc=mu_t, scale=sigma_t, a=(-1-mu_t) /sigma_t, b=(1-mu_t) /sigma_t
+    )
+    gauss_prod = truncated_gaussian.pdf(tilt_1) * truncated_gaussian.pdf(tilt_2)
+    return np.where(
+        gauss_prod <= 0.0, -1e300, np.log(0.25 * (1 - zeta) + zeta * gauss_prod)
+    )
 
 
 
@@ -55,12 +70,12 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         return (
             log_dNdtheta_samples,
             samples_inside,
-            np.exp(log_Nxi),
+            log_Nxi,
             inj_inside,
         )
 
 
-class M1ZDelaunay:
+class M1ZQDelaunay:
 
     def __init__(
         self,
@@ -74,9 +89,9 @@ class M1ZDelaunay:
         corners,
         minus_infinity=-1e300,
     ):
-        delaunay_indices = (0, 1)
-        if len(delaunay_indices) != 2:
-            raise ValueError("Two is the number of dimensions I shall triangulate over")
+        delaunay_indices = (0, 1, 2)
+        if len(delaunay_indices) != 3:
+            raise ValueError("Three is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
             events=events[:, delaunay_indices],
@@ -107,11 +122,12 @@ class M1ZDelaunay:
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, beta_q) = (
+        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = (
             population_parameters
         )
 
-        beta_q = beta_q.squeeze()
+        mu_var_chi = mu_var_chi.squeeze()
+        zeta_sigma_t = zeta_sigma_t.squeeze()
 
         triangulation_parameters = np.vstack([
             inner_tri_parameters,
@@ -123,34 +139,52 @@ class M1ZDelaunay:
         (
             log_dNdtheta_tri,
             samples_inside_tri,
-            Nxi_tri,
+            log_Nxi_tri,
             inj_inside_tri,
         ) = tri_result
 
-        # parameter_keys = ["m1", "z", "q"]
+        # parameter_keys = ["m1", "z", "q", "chi1", "chi2", "tilt1", "tilt2"]
         log_dNdtheta = (
             log_dNdtheta_tri
-            + q_log_pdf(
-                self.events[:,2], self.events[:,0],
-                beta_q, m_min=self.corners[0,0],
+            + chi_log_pdf(
+                self.events[:,3],
+                mu_var_chi[0], mu_var_chi[1],
+                )
+            + chi_log_pdf(
+                self.events[:,4],
+                mu_var_chi[0], mu_var_chi[1],
+                )
+            + tilts_log_pdf(
+                self.events[:,5], self.events[:,6],
+                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
                 )
         ).reshape(self.num_events, self.num_samples)
 
-        if ((log_dNdtheta - self.events_log_prior)>709).any():
+        to_integrate = log_dNdtheta - self.events_log_prior
+        if (to_integrate>709).any():
             return self.minus_infinity
 
-        NL_j_to_sum = samples_inside_tri * np.exp(log_dNdtheta - self.events_log_prior)
+        NL_j_to_sum = samples_inside_tri * np.exp(to_integrate)
         NL_j = NL_j_to_sum.sum(axis=-1) / self.num_samples
         var_NL_j = (
             (NL_j_to_sum**2).sum(axis=-1) / (self.num_samples - 1) - NL_j**2
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-        Nxi_presum = Nxi_tri * np.exp(
-            + q_log_pdf(
-                self.detected_injections[:,2], self.detected_injections[:,0],
-                beta_q, m_min=self.corners[0,0],
+        Nxi_presum = np.exp(
+            log_Nxi_tri
+            + chi_log_pdf(
+                self.detected_injections[:,3],
+                mu_var_chi[0], mu_var_chi[1],
                 )
+            + chi_log_pdf(
+                self.detected_injections[:,4],
+                mu_var_chi[0], mu_var_chi[1],
+                )
+            + tilts_log_pdf(
+                self.detected_injections[:,5], self.detected_injections[:,6],
+                zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
+            )
         )
 
         Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
@@ -159,20 +193,20 @@ class M1ZDelaunay:
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
             )
-        var_Nxi *= (
-                self.num_events
-                / self.delaunay_rate.delaunay_interpolator.compute_events()
-                )** 2
+        #var_Nxi *= (
+        #        self.num_events
+        #        / self.delaunay_rate.delaunay_interpolator.compute_events()
+        #        )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
-        #if Nxi**2 /var_Nxi <= 4*self.num_events:
-        #    logger.debug("Not enough injection stuff")
-        #    return self.minus_infinity
+        if Nxi**2 /var_Nxi <= 4*self.num_events:
+            logger.debug("Not enough injection stuff")
+            return self.minus_infinity
 
         ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
-        if (var_log_NL + var_Nxi) > 1:
-            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
-            return self.minus_infinity
+        #if (var_log_NL + var_Nxi) > 1:
+        #    logger.debug(f"Variance in log-likelihood estimator exceeds 1")
+        #    return self.minus_infinity
 
         # Correction for the likelihood (Heinzel & Vitale 2025)
         #NL_j = NL_j * np.exp(-var_Nxi/2)

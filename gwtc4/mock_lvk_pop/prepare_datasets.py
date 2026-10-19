@@ -373,6 +373,8 @@ for seed in seeds:
         priors/=kde_theta.evaluate(theta_obs)
 
         priors*=q_obs*(chirpmz_obs/(m1z_obs*m2z_obs))*(1+z_obs)**2
+
+        priors *= m1z_obs /(1+z_obs) # p(m1,m2,z) -> p(m1,q,z)
         
 
 
@@ -463,7 +465,7 @@ for seed in seeds:
 
     if not os.path.exists('datasets/'):
         os.mkdir('datasets/')
-    np.savez('datasets/'+name_out+'.npz',m1_obs=m1_obs,m2_obs=m2_obs,z_obs=z_obs,priors=priors,nsamples_ev=nsamples_ev)
+    np.savez('datasets/'+name_out+'.npz',m1_obs=m1_obs,q_obs=q_obs,z_obs=z_obs,priors=priors,nsamples_ev=nsamples_ev)
     np.savez('datasets/'+name_out+'_aux.npz',events=events,events_obs0=events_obs0,theta_obs0=theta_obs0,snrs_events_obs0=snrs_events_obs0,snrs_obs0=snrs_obs0,snrs_obs=snrs_obs,num_events_1=num_events_1,mtotz_obs0=mtotz_obs0,q_obs0=q_obs0,z_obs0=z_obs0)
 
 breakpoint()
