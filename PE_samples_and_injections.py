@@ -1,5 +1,6 @@
 import numpy as np
 import gwax.data as gwax
+import gwax.cosmology as cosmo
 
 import os
 import argparse
@@ -7,8 +8,7 @@ import argparse
 def load_and_save_PE_samples(catalog='GWTC-5', save_dir='./'):
     print('Loading PE samples for catalog:', catalog)
     pe_samples = gwax.get_posteriors(path='/home/tristan.bruel', catalog=catalog, 
-            extra_keys=['redshift'], 
-            downsample=True, stack=True,
+            downsample=True,
             )
 
     if catalog == 'GWTC-3':
@@ -19,15 +19,29 @@ def load_and_save_PE_samples(catalog='GWTC-5', save_dir='./'):
         filename = 'gwtc5_samples.npz'
     else:
         print('catalog', catalog, 'not available')
+    (
+        m1s,
+        m2s,
+        z,
+        jac,
+    ) = cosmo.detector_to_source(
+            pe_samples['mass_1'], 
+            pe_samples['mass_2'], 
+            pe_samples['luminosity_distance'], 
+            67.9, 0.3065,
+            )
+    prior = 1/pe_samples['weight'] # p(m1,m2,dl) 
+    prior *= jac # p(m1,m2,dl) -> p(m1s,m2s,z)
+    prior *= m1s # p(m1s,m2s,z) -> p(m1s,q,z)
     np.savez(os.path.join(save_dir, filename),
-            m1s=np.ravel(pe_samples['mass_1']),
-            zs=np.ravel(pe_samples['redshift']),
-            qs=np.ravel(pe_samples['mass_2']/pe_samples['mass_1']),
+            m1s=np.ravel(m1s),
+            zs=np.ravel(z),
+            qs=np.ravel(m2s/m1s),
             chi1s=np.ravel(pe_samples['a_1']),
             chi2s=np.ravel(pe_samples['a_2']),
             cos_tilt_1s=np.ravel(pe_samples['cos_tilt_1']),
             cos_tilt_2s=np.ravel(pe_samples['cos_tilt_2']),
-            priors=1/np.ravel(pe_samples['weight']),
+            priors=np.ravel(prior),
             nevents=pe_samples['mass_1'].shape[0],
             nsamples=pe_samples['mass_1'].shape[1],
             )
@@ -47,16 +61,32 @@ def load_and_save_injections(catalog='GWTC-5', save_dir='./'):
         filename = 'gwtc5_injections_full.npz'
     else:
         print('catalog', catalog, 'not available')
+
+    (
+        m1s,
+        m2s,
+        z,
+        jac,
+    ) = cosmo.detector_to_source(
+            inj_gwtc['mass_1'],
+            inj_gwtc['mass_2'], 
+            inj_gwtc['luminosity_distance'],
+            67.9, 0.3065,
+            )
+    prior = 1/inj_gwtc['weight'] # p(m1,m2,dl) 
+    prior *= jac # p(m1,m2,dl) -> p(m1s,m2s,z)
+    prior *= m1s # p(m1s,m2s,z) -> p(m1s,q,z)
     np.savez(os.path.join(save_dir,filename),
-            m1s=np.ravel(inj_gwtc['mass_1']),
-            zs=np.ravel(inj_gwtc['redshift']),
-            qs=np.ravel(inj_gwtc['mass_2']/inj_gwtc['mass_1']),
+            m1s=np.ravel(m1s),
+            zs=np.ravel(z),
+            qs=np.ravel(m2s/m1s),
             chi1s=np.ravel(inj_gwtc['a_1']),
             chi2s=np.ravel(inj_gwtc['a_2']),
             cos_tilt_1s=np.ravel(inj_gwtc['cos_tilt_1']),
             cos_tilt_2s=np.ravel(inj_gwtc['cos_tilt_2']),
-            inj_priors=1/np.ravel(inj_gwtc['weight']),
+            inj_priors=np.ravel(prior),
             ninjs=inj_gwtc['total'],
+            analysis_time=inj_gwtc['time'],
             )
     return inj_gwtc
 
@@ -78,4 +108,3 @@ if __name__ == "__main__":
 
     pe_samples = load_and_save_PE_samples(catalog=args.catalog, save_dir=args.save_dir)
     inj_gwtc = load_and_save_injections(catalog=args.catalog, save_dir=args.save_dir)
-

@@ -415,6 +415,19 @@ if __name__ == "__main__":
             )
             inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
 
+        ## Set initial points to last chain of previous run
+        #for t, w in product(range(ntemps), range(nwalkers)):
+        #    for branch in branch_names:
+        #        coords[branch][t, w] = last_backend.chain[branch][-1, t, w]
+        #        inds[branch][t, w] = last_backend.inds[branch][-1, t, w]
+
+        #    print(t, w)
+        #    print(
+        #        log_like_fn(
+        #            [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
+        #        )
+        #    )
+
         ## Set initial points of all temperatures to last chain of first temperature (2nd and 3rd are kinda lost) ##
         for t, w in product(range(ntemps), range(nwalkers)):
             for branch in branch_names:
