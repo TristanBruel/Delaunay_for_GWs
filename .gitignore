@@ -3,8 +3,3 @@ bimodal_gaussian/*.txt
 bimodal_gaussian/backend*
 trimodal_gaussian/*.txt
 trimodal_gaussian/backend*
-gwtc*/*/*/backend*
-gwtc*/*/*.npz
-gwtc4/mock_lvk_pop/datasets/*
-gwtc4/mock_lvk_pop/injections/*
-gwtc4/mock_lvk_pop/*/backend*
