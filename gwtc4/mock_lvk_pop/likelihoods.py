@@ -143,10 +143,6 @@ class M1ZQDelaunay:
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
             )
-        #var_Nxi *= (
-        #        self.num_events
-        #        / self.delaunay_rate.delaunay_interpolator.compute_events()
-        #        )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
         if Nxi**2 /var_Nxi <= 4*self.num_events:
@@ -154,6 +150,10 @@ class M1ZQDelaunay:
             return self.minus_infinity
 
         ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
+        #var_Nxi *= (
+        #        self.num_events
+        #        / self.delaunay_rate.delaunay_interpolator.compute_events()
+        #        )** 2
         #if (var_log_NL + var_Nxi) > 1:
         #    logger.debug(f"Variance in log-likelihood estimator exceeds 1")
         #    return self.minus_infinity

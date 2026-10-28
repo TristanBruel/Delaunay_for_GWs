@@ -150,7 +150,7 @@ class DelaunayLogLikelihood:
         num_events,
         num_samples,
         detected_injections,
-        detected_injections_prior,
+        detected_injections_log_prior,
         num_injections,
         minus_infinity=-1e300,
     ):
@@ -165,7 +165,7 @@ class DelaunayLogLikelihood:
             events_log_prior.reshape(self.num_events, self.num_samples)
         )
         self.detected_injections = detected_injections
-        self.detected_injections_prior = detected_injections_prior
+        self.detected_injections_log_prior = detected_injections_log_prior
         self.num_injections = num_injections
 
         self.minus_infinity = minus_infinity
@@ -208,14 +208,21 @@ class DelaunayLogLikelihood:
         )
         log_Nxi = self.delaunay_interpolator._interpolate(inj_simplex, inj_b)
 
-        maybe_infinity = np.exp(log_Nxi)
-        if np.isinf(maybe_infinity).any():
-            return self.minus_infinity
+        #maybe_infinity = np.exp(log_Nxi)
+        #if np.isinf(maybe_infinity).any():
+        #    return self.minus_infinity
 
         inj_inside = inj_simplex != -1
+        #Nxi = (
+        #    maybe_infinity * inj_inside / self.detected_injections_prior
+        #).sum() / self.num_injections
+        to_integrate = log_Nxi - self.detected_injections_log_prior
+        maybe_infinity = np.exp(to_integrate)
+        if np.isinf(maybe_infinity).any():
+            return self.minus_infinity
         Nxi = (
-            maybe_infinity * inj_inside / self.detected_injections_prior
-        ).sum() / self.num_injections
+                inj_inside * np.exp(to_integrate)
+              ).sum() /self.num_injections
 
         return (
             (log_bayes_factors - np.log(actual_num_samples)).sum() - Nxi

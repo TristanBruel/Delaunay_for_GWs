@@ -9,6 +9,9 @@ from scipy.stats import gaussian_kde
 from popsummary.popresult import PopulationResult
 import os
 
+import gwax.data as gwax
+import gwax.cosmology as cosmo
+
 
 thetas_draw=utils.draw_thetas(10000)
 kde_theta=gaussian_kde(thetas_draw,bw_method='scott')
@@ -368,14 +371,31 @@ for seed in seeds:
        
             
     
-        priors=np.absolute((snrs_obs/dl_obs)*ddl_zs_spline(z_obs))
+        #priors=np.absolute((snrs_obs/dl_obs)*ddl_zs_spline(z_obs))
           
-        priors/=kde_theta.evaluate(theta_obs)
+        #priors/=kde_theta.evaluate(theta_obs)
 
-        priors*=q_obs*(chirpmz_obs/(m1z_obs*m2z_obs))*(1+z_obs)**2 # p(Mc,q,z) -> p(m1,m2,z)
+        #priors*=q_obs*(chirpmz_obs/(m1z_obs*m2z_obs))*(1+z_obs)**2 # p(Mc,q,z) -> p(m1,m2,z)
 
-        priors *= m1z_obs /(1+z_obs) # p(m1,m2,z) -> p(m1,q,z)
-        
+        #priors *= m1z_obs /(1+z_obs) # p(m1,m2,z) -> p(m1,q,z)
+
+        priors = gwax.compute_initial_prior(
+                dict(luminosity_distance = dl_obs),
+                catalog='GWTC-4',
+            )
+        (
+            m1s,
+            m2s,
+            z,
+            jac,
+        ) = cosmo.detector_to_source( 
+            m1z_obs,
+            m2z_obs,
+            dl_obs,
+            67.9, 0.3065,
+        )
+        priors *= jac # p(m1,m2,dl) -> p(m1s,m2s,z)
+        priors *= m1s # p(m1s,m2s,z) -> p(m1s,q,z)
 
 
         # print(priors)
