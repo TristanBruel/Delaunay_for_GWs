@@ -24,7 +24,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, M1ZQDelaunay
+from likelihoods import SimpleDelaunay, MZQDelaunay
 
 
 
@@ -175,7 +175,7 @@ if __name__ == "__main__":
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
-    injection_priors = injections_file["inj_priors"]
+    injection_logpriors = np.log(injections_file["inj_priors"])
     num_injections = int(injections_file["ninjs"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
@@ -194,13 +194,13 @@ if __name__ == "__main__":
         [m1_max, z_max, q_max],
     ])
 
-    log_like_fn = M1ZQDelaunay(
+    log_like_fn = MZQDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,
         num_samples=num_samples,
         detected_injections=detected_injections,
-        detected_injections_prior=injection_priors,
+        detected_injections_log_prior=injection_logpriors,
         num_injections=num_injections,
         corners=corners,
     )
@@ -416,23 +416,10 @@ if __name__ == "__main__":
             inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
 
         ## Set initial points to last chain of previous run
-        #for t, w in product(range(ntemps), range(nwalkers)):
-        #    for branch in branch_names:
-        #        coords[branch][t, w] = last_backend.chain[branch][-1, t, w]
-        #        inds[branch][t, w] = last_backend.inds[branch][-1, t, w]
-
-        #    print(t, w)
-        #    print(
-        #        log_like_fn(
-        #            [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
-        #        )
-        #    )
-
-        ## Set initial points of all temperatures to last chain of first temperature (2nd and 3rd are kinda lost) ##
         for t, w in product(range(ntemps), range(nwalkers)):
             for branch in branch_names:
-                coords[branch][t, w] = last_backend.chain[branch][-1, 0, w]
-                inds[branch][t, w] = last_backend.inds[branch][-1, 0, w]
+                coords[branch][t, w] = last_backend.chain[branch][-1, t, w]
+                inds[branch][t, w] = last_backend.inds[branch][-1, t, w]
 
             print(t, w)
             print(
@@ -440,6 +427,19 @@ if __name__ == "__main__":
                     [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
                 )
             )
+
+        ## Set initial points of all temperatures to last chain of first temperature (2nd and 3rd are kinda lost) ##
+        #for t, w in product(range(ntemps), range(nwalkers)):
+        #    for branch in branch_names:
+        #        coords[branch][t, w] = last_backend.chain[branch][-1, 0, w]
+        #        inds[branch][t, w] = last_backend.inds[branch][-1, 0, w]
+
+        #    print(t, w)
+        #    print(
+        #        log_like_fn(
+        #            [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
+        #        )
+        #    )
 
         state = State(coords, inds=inds)
         backend = None

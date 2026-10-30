@@ -24,7 +24,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, McZQChieffDelaunay
+from likelihoods import SimpleDelaunay, MZQChieffDelaunay
 
 
 
@@ -87,14 +87,24 @@ def set_priors(corners, w_min, w_max):
 
 
 
-def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
-                    nleaves_min, nleaves_max, priors):
+def define_moves(
+        Mc_min, Mc_max,
+        z_min, z_max,
+        q_min, q_max,
+        chi_eff_min, chi_eff_max,
+        nleaves_min, nleaves_max, priors,
+        ):
     """
     Define moves for the sampling
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.05 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
+            sigma_vertices=0.05 * np.array([
+                Mc_max - Mc_min,
+                z_max - z_min,
+                q_max - q_min,
+                chi_eff_max - chi_eff_min
+                ]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -131,8 +141,8 @@ if __name__ == "__main__":
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
-    parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
-    parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
+    parser.add_argument("--Mcmin", dest='Mc_min', help="Lower range of the chirp mass distribution", type=float, default=2.5)
+    parser.add_argument("--Mcmax", dest='Mc_max', help="Upper range of the chirp mass distribution", type=float, default=150.0)
     parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
     parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=1.5)
     parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
@@ -155,8 +165,9 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q", "chi_eff"]
-    data_file = np.load("./gwtc5_samples_chieff.npz")
+    data_file = np.load("../z_m1_q_chieff/gwtc5_samples_chieff.npz")
     observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
+    observed_events[:,0] = observed_events[:,0] *observed_events[:,2]**(3/5) /(1+observed_events[:,2])**(1/5) # m1 -> Mc
     event_logpriors = np.log(data_file["priors"])
     log_jacobian = -np.log((observed_events[:,2])**(3/5) /(1+observed_events[:,2])**(1/5)) # p(m1,z,q,chieff) -> p(Mc,z,q,chieff)
     event_logpriors += log_jacobian
@@ -167,10 +178,11 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, len(parameter_keys)).mean(axis=1)
 
-    injections_file = np.load("./gwtc5_injections_full_chieff.npz")
+    injections_file = np.load("../z_m1_q_chieff/gwtc5_injections_full_chieff.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
+    detected_injections[:,0] = detected_injections[:,0] *detected_injections[:,2]**(3/5) /(1+detected_injections[:,2])**(1/5) # m1 -> Mc
     injection_logpriors = np.log(injections_file["inj_priors"])
     log_jacobian = -np.log((detected_injections[:,2])**(3/5) /(1+detected_injections[:,2])**(1/5)) # p(m1,z,q,chieff) -> p(Mc,z,q,chieff)
     injection_logpriors += log_jacobian
@@ -179,28 +191,28 @@ if __name__ == "__main__":
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
     )
 
-    m1_min, m1_max, z_min, z_max, q_min, q_max, chi_eff_min, chi_eff_max = \
-            args.m1_min, args.m1_max, args.z_min, args.z_max, args.q_min, args.q_max, args.chi_eff_min, args.chi_eff_max
+    Mc_min, Mc_max, z_min, z_max, q_min, q_max, chi_eff_min, chi_eff_max = \
+            args.Mc_min, args.Mc_max, args.z_min, args.z_max, args.q_min, args.q_max, args.chi_eff_min, args.chi_eff_max
     corners = np.array([
-        [m1_min, z_min, q_min, chi_eff_min],
-        [m1_min, z_min, q_min, chi_eff_max],
-        [m1_min, z_min, q_max, chi_eff_min],
-        [m1_min, z_min, q_max, chi_eff_max],
-        [m1_min, z_max, q_min, chi_eff_min],
-        [m1_min, z_max, q_min, chi_eff_max],
-        [m1_min, z_max, q_max, chi_eff_min],
-        [m1_min, z_max, q_max, chi_eff_max],
-        [m1_max, z_min, q_min, chi_eff_min],
-        [m1_max, z_min, q_min, chi_eff_max],
-        [m1_max, z_min, q_max, chi_eff_min],
-        [m1_max, z_min, q_max, chi_eff_max],
-        [m1_max, z_max, q_min, chi_eff_min],
-        [m1_max, z_max, q_min, chi_eff_max],
-        [m1_max, z_max, q_max, chi_eff_min],
-        [m1_max, z_max, q_max, chi_eff_max],
+        [Mc_min, z_min, q_min, chi_eff_min],
+        [Mc_min, z_min, q_min, chi_eff_max],
+        [Mc_min, z_min, q_max, chi_eff_min],
+        [Mc_min, z_min, q_max, chi_eff_max],
+        [Mc_min, z_max, q_min, chi_eff_min],
+        [Mc_min, z_max, q_min, chi_eff_max],
+        [Mc_min, z_max, q_max, chi_eff_min],
+        [Mc_min, z_max, q_max, chi_eff_max],
+        [Mc_max, z_min, q_min, chi_eff_min],
+        [Mc_max, z_min, q_min, chi_eff_max],
+        [Mc_max, z_min, q_max, chi_eff_min],
+        [Mc_max, z_min, q_max, chi_eff_max],
+        [Mc_max, z_max, q_min, chi_eff_min],
+        [Mc_max, z_max, q_min, chi_eff_max],
+        [Mc_max, z_max, q_max, chi_eff_min],
+        [Mc_max, z_max, q_max, chi_eff_max],
     ])
 
-    log_like_fn = McZQChieffDelaunay(
+    log_like_fn = MZQChieffDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,
@@ -456,7 +468,10 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, z_min, z_max, q_min, q_max,
+            Mc_min, Mc_max, 
+            z_min, z_max, 
+            q_min, q_max,
+            chi_eff_min, chi_eff_max,
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

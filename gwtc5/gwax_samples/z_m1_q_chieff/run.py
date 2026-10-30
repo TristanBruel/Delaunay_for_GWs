@@ -24,7 +24,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, M1ZQChieffDelaunay
+from likelihoods import SimpleDelaunay, MZQChieffDelaunay
 
 
 
@@ -87,14 +87,24 @@ def set_priors(corners, w_min, w_max):
 
 
 
-def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
-                    nleaves_min, nleaves_max, priors):
+def define_moves(
+        m1_min, m1_max,
+        z_min, z_max,
+        q_min, q_max,
+        chi_eff_min, chi_eff_max,
+        nleaves_min, nleaves_max, priors,
+        ):
     """
     Define moves for the sampling
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.05 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
+            sigma_vertices=0.05 * np.array([
+                m1_max - m1_min,
+                z_max - z_min,
+                q_max - q_min,
+                chi_eff_max - chi_eff_min
+                ]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -163,13 +173,13 @@ if __name__ == "__main__":
     print(
         f"Running with {num_events} events × {num_samples} samples = {num_events*num_samples} total samples"
     )
-    barycenters = observed_events.reshape(num_events, num_samples, 7).mean(axis=1)
+    barycenters = observed_events.reshape(num_events, num_samples, len(parameter_keys)).mean(axis=1)
 
     injections_file = np.load("./gwtc5_injections_full_chieff.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
-    injection_priors = injections_file["inj_priors"]
+    injection_logpriors = np.log(injections_file["inj_priors"])
     num_injections = int(injections_file["ninjs"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
@@ -196,13 +206,13 @@ if __name__ == "__main__":
         [m1_max, z_max, q_max, chi_eff_max],
     ])
 
-    log_like_fn = M1ZQChieffDelaunay(
+    log_like_fn = MZQChieffDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,
         num_samples=num_samples,
         detected_injections=detected_injections,
-        detected_injections_prior=injection_priors,
+        detected_injections_log_prior=injection_logpriors,
         num_injections=num_injections,
         corners=corners,
     )
@@ -452,7 +462,10 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, z_min, z_max, q_min, q_max,
+            m1_min, m1_max, 
+            z_min, z_max, 
+            q_min, q_max,
+            chi_eff_min, chi_eff_max,
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

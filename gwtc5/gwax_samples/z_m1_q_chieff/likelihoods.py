@@ -51,7 +51,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
 
 
-class M1ZChieffQDelaunay:
+class MZQChieffDelaunay:
 
     def __init__(
         self,
@@ -60,14 +60,14 @@ class M1ZChieffQDelaunay:
         num_events,
         num_samples,
         detected_injections,
-        detected_injections_prior,
+        detected_injections_log_prior,
         num_injections,
         corners,
         minus_infinity=-1e300,
     ):
-        delaunay_indices = (0, 1, 2)
-        if len(delaunay_indices) != 3:
-            raise ValueError("Three is the number of dimensions I shall triangulate over")
+        delaunay_indices = (0, 1, 2, 3)
+        if len(delaunay_indices) != 4:
+            raise ValueError("Four is the number of dimensions I shall triangulate over")
 
         self.delaunay_rate = SimpleDelaunay(
             events=events[:, delaunay_indices],
@@ -75,7 +75,7 @@ class M1ZChieffQDelaunay:
             num_events=num_events,
             num_samples=num_samples,
             detected_injections=detected_injections[:, delaunay_indices],
-            detected_injections_prior=detected_injections_prior,
+            detected_injections_log_prior=detected_injections_log_prior,
             num_injections=num_injections,
             minus_infinity=None,
         )
@@ -92,18 +92,15 @@ class M1ZChieffQDelaunay:
         )
 
         self.detected_injections = detected_injections
-        self.detected_injections_prior = detected_injections_prior
+        self.detected_injections_log_prior = detected_injections_log_prior
         self.num_injections = num_injections
 
         self.minus_infinity = minus_infinity
 
     def __call__(self, population_parameters):
-        (inner_tri_parameters, corner_weights, mu_var_chi, zeta_sigma_t) = (
+        (inner_tri_parameters, corner_weights) = (
             population_parameters
         )
-
-        mu_var_chi = mu_var_chi.squeeze()
-        zeta_sigma_t = zeta_sigma_t.squeeze()
 
         triangulation_parameters = np.vstack([
             inner_tri_parameters,
@@ -123,7 +120,6 @@ class M1ZChieffQDelaunay:
         log_dNdtheta = (
             log_dNdtheta_tri
         ).reshape(self.num_events, self.num_samples)
-
         to_integrate = log_dNdtheta - self.events_log_prior
         if (to_integrate>709).any():
             return self.minus_infinity
@@ -135,11 +131,14 @@ class M1ZChieffQDelaunay:
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-        Nxi_presum = np.exp(
-            log_Nxi_tri
-        )
-
-        Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
+        #Nxi_presum = np.exp(
+        #    log_Nxi_tri
+        #)
+        #Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
+        Nxi_to_integrate = log_Nxi_tri - self.detected_injections_log_prior
+        if (Nxi_to_integrate>709).any():
+            return self.minus_infinity
+        Nxi_to_sum = inj_inside_tri * np.exp(Nxi_to_integrate)
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)

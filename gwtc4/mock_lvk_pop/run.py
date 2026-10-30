@@ -165,7 +165,7 @@ if __name__ == "__main__":
     detected_injections = np.vstack(
         [injections_file[key + "s_inj"] for key in parameter_keys]
     ).T
-    injection_priors = injections_file["priors_inj"]
+    injection_logpriors = np.log(injections_file["priors_inj"])
     num_injections = int(injections_file["ninj"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
@@ -190,7 +190,7 @@ if __name__ == "__main__":
         num_events=num_events,
         num_samples=num_samples,
         detected_injections=detected_injections,
-        detected_injections_prior=injection_priors,
+        detected_injections_log_prior=injection_logpriors,
         num_injections=num_injections,
         corners=corners,
     )

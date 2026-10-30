@@ -75,7 +75,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
 
 
-class M1ZQDelaunay:
+class MZQDelaunay:
 
     def __init__(
         self,
@@ -84,7 +84,7 @@ class M1ZQDelaunay:
         num_events,
         num_samples,
         detected_injections,
-        detected_injections_prior,
+        detected_injections_log_prior,
         num_injections,
         corners,
         minus_infinity=-1e300,
@@ -99,7 +99,7 @@ class M1ZQDelaunay:
             num_events=num_events,
             num_samples=num_samples,
             detected_injections=detected_injections[:, delaunay_indices],
-            detected_injections_prior=detected_injections_prior,
+            detected_injections_log_prior=detected_injections_log_prior,
             num_injections=num_injections,
             minus_infinity=None,
         )
@@ -116,7 +116,7 @@ class M1ZQDelaunay:
         )
 
         self.detected_injections = detected_injections
-        self.detected_injections_prior = detected_injections_prior
+        self.detected_injections_log_prior = detected_injections_log_prior
         self.num_injections = num_injections
 
         self.minus_infinity = minus_infinity
@@ -159,7 +159,6 @@ class M1ZQDelaunay:
                 zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
                 )
         ).reshape(self.num_events, self.num_samples)
-
         to_integrate = log_dNdtheta - self.events_log_prior
         if (to_integrate>709).any():
             return self.minus_infinity
@@ -171,7 +170,7 @@ class M1ZQDelaunay:
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-        Nxi_presum = np.exp(
+        log_Nxi_presum = (
             log_Nxi_tri
             + chi_log_pdf(
                 self.detected_injections[:,3],
@@ -186,8 +185,11 @@ class M1ZQDelaunay:
                 zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
             )
         )
-
-        Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
+        Nxi_to_integrate = log_Nxi_presum - self.detected_injections_log_prior
+        if (Nxi_to_integrate>709).any():
+            return self.minus_infinity
+        Nxi_to_sum = inj_inside_tri * np.exp(Nxi_to_integrate)
+        #Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)

@@ -51,7 +51,7 @@ class SimpleDelaunay(delaunaytor.DelaunayLogLikelihood):
         )
 
 
-class McZQChieffDelaunay:
+class MZQChieffDelaunay:
 
     def __init__(
         self,
@@ -120,7 +120,6 @@ class McZQChieffDelaunay:
         log_dNdtheta = (
             log_dNdtheta_tri
         ).reshape(self.num_events, self.num_samples)
-
         to_integrate = log_dNdtheta - self.events_log_prior
         if (to_integrate>709).any():
             return self.minus_infinity
@@ -132,15 +131,14 @@ class McZQChieffDelaunay:
         ) / self.num_samples
         var_log_NL = np.inf if (NL_j < 1e-20).any() else (var_NL_j / NL_j**2).sum()
 
-
-        to_integrate = log_Nxi_tri - self.detected_injections_log_prior
-        if (to_integrate>709).any():
-            return self.minus_infinity
-        Nxi_to_sum = inj_inside_tri * np.exp(to_integrate)
         #Nxi_presum = np.exp(
         #    log_Nxi_tri
         #)
         #Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
+        Nxi_to_integrate = log_Nxi_tri - self.detected_injections_log_prior
+        if (Nxi_to_integrate>709).any():
+            return self.minus_infinity
+        Nxi_to_sum = inj_inside_tri * np.exp(Nxi_to_integrate)
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
