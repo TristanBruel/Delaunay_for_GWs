@@ -152,7 +152,7 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q"]
-    filename = './datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_1.5_seed_%s.npz' %args.seed
+    filename = './datasets/samples_no_mass_gap_pop_153_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %args.seed
     data_file = np.load(filename)
     observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
