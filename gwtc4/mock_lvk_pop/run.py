@@ -123,8 +123,8 @@ if __name__ == "__main__":
 
     # Define command line options
     parser = argparse.ArgumentParser()
-    # Save dir
-    parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='outdir0')
+    # Random seed for mock population
+    parser.add_argument("--seed", dest='seed', help="Random seed that was used to generate the mock gw events", type=int, default=1)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
@@ -146,11 +146,13 @@ if __name__ == "__main__":
     nprocs, nwalkers, ntemps, nburn, nsteps = \
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
-    os.makedirs(f"{args.label}", exist_ok=True)
+
+    label = 'z_m1_q_seed%i' %args.seed
+    os.makedirs(f"{label}", exist_ok=True)
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q"]
-    filename = './datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_1.5_seed_1.npz'
+    filename = './datasets/samples_no_mass_gap_pop_153_evs_5000_samples_sample_in_q_zmax_1.5_seed_%s.npz' %args.seed
     data_file = np.load(filename)
     observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
@@ -161,12 +163,24 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, 3).mean(axis=1)
 
-    injections_file = np.load("./injections/injections.npz")
+    #injections_file = np.load("./injections/injections.npz")
+    #detected_injections = np.vstack(
+    #    [injections_file[key + "s_inj"] for key in parameter_keys]
+    #).T
+    #injection_logpriors = np.log(injections_file["priors_inj"])
+    #num_injections = int(injections_file["ninj"])
+    #print(
+    #    f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
+    #)
+
+    ## Run with the actual GWTC-4 injections ##
+    parameter_keys = ["m1", "z", "q"]
+    injections_file = np.load("../gwax_samples/gwtc4_injections_full.npz")
     detected_injections = np.vstack(
-        [injections_file[key + "s_inj"] for key in parameter_keys]
+        [injections_file[key + "s"] for key in parameter_keys]
     ).T
-    injection_logpriors = np.log(injections_file["priors_inj"])
-    num_injections = int(injections_file["ninj"])
+    injection_logpriors = np.log(injections_file["inj_priors"])
+    num_injections = int(injections_file["ninjs"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
     )
@@ -203,7 +217,7 @@ if __name__ == "__main__":
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)
 
-    backend_file = f"{args.label}/backend"
+    backend_file = f"{label}/backend"
     if not os.path.exists(backend_file):
         print("NO BACKEND; STARTING FROM SCRATCH!")
         # Initialize

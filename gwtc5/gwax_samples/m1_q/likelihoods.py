@@ -25,12 +25,11 @@ dVc_spline = spline(z_anchors, dVc_anchors)
 def z_pdf_not_norm(z, kappa):
     return (1 + z) ** (kappa - 1) * dVc_spline(z)
 
-
 def z_log_pdf(z, kappa, z_max=z_max):
     out_bounds = z > z_max
     z_grid = np.linspace(0, z_max, 1_000)
-    p_of_z = z_pdf_not_norm(z, kappa) / np.trapz(
-        z_pdf_not_norm(z_grid, kappa), x=z_grid
+    p_of_z = z_pdf_not_norm(z, kappa) / np.trapezoid(
+        y=z_pdf_not_norm(z_grid, kappa), x=z_grid
     )
     return np.where(out_bounds, -1e300, np.log(p_of_z))
 
