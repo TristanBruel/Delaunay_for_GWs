@@ -135,7 +135,7 @@ if __name__ == "__main__":
     # Define command line options
     parser = argparse.ArgumentParser()
     # Save dir
-    parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='outdir0')
+    parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='./')
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
