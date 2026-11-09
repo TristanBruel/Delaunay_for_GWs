@@ -125,6 +125,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Random seed for mock population
     parser.add_argument("--seed", dest='seed', help="Random seed that was used to generate the mock gw events", type=int, default=1)
+    # Number of events in mock population
+    parser.add_argument("--events", dest='events', help="Number of events in the mock population", type=int, default=153)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
@@ -147,12 +149,12 @@ if __name__ == "__main__":
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
 
-    label = 'z_m1_q_seed%i' %args.seed
+    label = 'z_m1_q_%ievs_seed%i' %(args.events,args.seed)
     os.makedirs(f"{label}", exist_ok=True)
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q"]
-    filename = './datasets/samples_no_mass_gap_pop_153_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %args.seed
+    filename = './datasets/samples_no_mass_gap_pop_%i_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %(args.events,args.seed)
     data_file = np.load(filename)
     observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
