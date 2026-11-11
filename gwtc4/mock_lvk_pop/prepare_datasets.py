@@ -13,7 +13,8 @@ import os
 thetas_draw=utils.draw_thetas(10000)
 kde_theta=gaussian_kde(thetas_draw,bw_method='scott')
 
-seeds=[1,2,3,4,5]
+seeds=[1]
+#seeds=[1,2,3,4,5]
 
 
 no_selection=0
@@ -23,7 +24,7 @@ sample_in_mtot=0
 sample_in_z=0
 sample_in_source=0
 nsamples_ev=3194 # same number as gwax samples for GWTC-4
-nevs=4*153
+nevs=153
 # large_snr=1
 very_large_snr=0
 snr_th=8
@@ -120,7 +121,7 @@ m2s_grid=file['m2s_grid']
 snrs_grid=file['snrs_grid']
     
 snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid], snrs_grid,
-                                   bounds_error=False, fill_value=None,
+                                   #bounds_error=False, fill_value=None,
                                    )
 Dfix=500
 
