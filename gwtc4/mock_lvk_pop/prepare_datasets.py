@@ -467,4 +467,4 @@ for seed in seeds:
     np.savez('datasets/'+name_out+'.npz',m1_obs=m1_obs,q_obs=q_obs,z_obs=z_obs,priors=priors,nsamples_ev=nsamples_ev)
     np.savez('datasets/'+name_out+'_aux.npz',events=events,events_obs0=events_obs0,theta_obs0=theta_obs0,snrs_events_obs0=snrs_events_obs0,snrs_obs0=snrs_obs0,snrs_obs=snrs_obs,num_events_1=num_events_1,mtotz_obs0=mtotz_obs0,q_obs0=q_obs0,z_obs0=z_obs0)
 
-breakpoint()
+#breakpoint()

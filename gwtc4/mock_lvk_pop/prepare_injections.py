@@ -23,7 +23,7 @@ snrs_grid=file['snrs_grid']
 Dfix=500
 
 snr_interp=RegularGridInterpolator([m1s_grid,m2s_grid], snrs_grid, 
-                                   bounds_error=False, fill_value=None,
+                                   #bounds_error=False, fill_value=None,
                                    )
 
 
@@ -37,29 +37,35 @@ result = PopulationResult(fname=filename)
 #result = PopulationResult(fname=filename)
 
 
-hyper_samples=result.get_hyperparameter_samples(hyperparameters=['alpha_1', 'alpha_2' , 'break_mass', 'delta_m_1', 'lam_0', 'lam_1', 'lamb', 'mlow_1', 'mpp_1', 'sigpp_1' , 'mpp_2', 'sigpp_2', 'beta'])
+hyper_samples=result.get_hyperparameter_samples(hyperparameters=['alpha_1', 'alpha_2', 'break_mass', 'mlow_1', 'mpp_1', 'sigpp_1', 'mpp_2', 'sigpp_2', 'lam_0', 'lam_1', 'delta_m_1', 'lamb', 'beta'])
 
 params={}
 
 id_sample=-3
 
+## Primary mass distribution
+# power-law
 params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
-params['m1_low']=hyper_samples[id_sample,7]
-params['m1_high']=200.
-params['mu_1']=hyper_samples[id_sample,8]
-params['sigma_1']=hyper_samples[id_sample,9] 
-params['mu_2'] = hyper_samples[id_sample,10] 
-params['sigma_2'] = hyper_samples[id_sample,11] 
-params['lamda_0'] = hyper_samples[id_sample,4] 
-params['lamda_1'] = hyper_samples[id_sample,5] 
-params['delta_m1'] = hyper_samples[id_sample,3] 
-
-params['kappa']=hyper_samples[id_sample,6] 
-
-# params['betaq']=hyper_samples[id_sample,12] 
-params['betaq']=4
+params['m1_low']=hyper_samples[id_sample,3]
+params['m1_high']=300.
+# peak 1
+params['mu_1']=hyper_samples[id_sample,4]
+params['sigma_1']=hyper_samples[id_sample,5]
+# peak 2
+params['mu_2']=hyper_samples[id_sample,6]
+params['sigma_2']=hyper_samples[id_sample,7]
+# mixing fracions
+params['lamda_0']=hyper_samples[id_sample,8] 
+params['lamda_1']=hyper_samples[id_sample,9] 
+# tapering
+params['delta_m1']=hyper_samples[id_sample,10] 
+## Redshift evolution
+params['kappa']=hyper_samples[id_sample,11] 
+## Mass ratio distribution
+params['betaq']=hyper_samples[id_sample,12] 
+# params['betaq']=4
 
 
 
@@ -144,4 +150,4 @@ name_file_injections='injections/injections'
 
 np.savez(name_file_injections+'.npz',m1s_inj=m1s_inj,qs_inj=qs_inj,zs_inj=zs_inj,priors_inj=priors_inj,ninj=ninj)
 
-breakpoint()
+#breakpoint()
