@@ -131,8 +131,10 @@ if __name__ == "__main__":
 
     # Define command line options
     parser = argparse.ArgumentParser()
-    # Save dir
-    parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='./')
+    # Random seed for mock population
+    parser.add_argument("--seed", dest='seed', help="Random seed that was used to generate the mock gw events", type=int, default=1)
+    # Number of events in mock population
+    parser.add_argument("--events", dest='events', help="Number of events in the mock population", type=int, default=153)
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
@@ -152,7 +154,9 @@ if __name__ == "__main__":
     nprocs, nwalkers, ntemps, nburn, nsteps = \
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
-    os.makedirs(f"{args.label}", exist_ok=True)
+
+    label = 'm1_q_%ievs_seed%i' %(args.events,args.seed)
+    os.makedirs(f"{label}", exist_ok=True)
 
     # READ data and injections
     parameter_keys = []
@@ -214,7 +218,7 @@ if __name__ == "__main__":
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)
 
-    backend_file = f"{args.label}/backend"
+    backend_file = f"{label}/backend"
     if not os.path.exists(backend_file):
         print("NO BACKEND; STARTING FROM SCRATCH!")
         # Initialize

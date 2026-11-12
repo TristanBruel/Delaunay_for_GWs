@@ -150,7 +150,7 @@ if __name__ == "__main__":
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
 
-    label = '%ievs_seed%i' %(args.events,args.seed)
+    label = 'm1_z_q_%ievs_seed%i' %(args.events,args.seed)
     os.makedirs(f"{label}", exist_ok=True)
 
     # READ data and injections
