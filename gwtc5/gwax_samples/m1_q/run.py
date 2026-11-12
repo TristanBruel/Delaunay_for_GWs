@@ -166,7 +166,7 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q", "chi1", "chi2", "cos_tilt_1", "cos_tilt_2"]
-    data_file = np.load("../z_m1_q/gwtc5_samples.npz")
+    data_file = np.load("../gwtc5_samples.npz")
     observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
     num_events = int(data_file["nevents"])
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, len(parameter_keys)).mean(axis=1)
 
-    injections_file = np.load("../z_m1_q/gwtc5_injections_full.npz")
+    injections_file = np.load("../gwtc5_injections_full.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T

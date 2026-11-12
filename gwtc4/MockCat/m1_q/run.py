@@ -25,7 +25,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, M1ZQDelaunay
+from likelihoods import SimpleDelaunay, MQDelaunay
 
 
 
@@ -37,7 +37,7 @@ def make_valid_delaunay(event_points, num_vertices, corners):
         ])
     inside_corners = np.sum(inside_corners,axis=0)==corners.shape[1]
     points = event_points[inside_corners]
-    dim = 3
+    dim = 2
     offset = 2**dim
     min_max = np.array([
         [np.min(points[:, i]), np.max(points[:, i])]
@@ -72,27 +72,33 @@ def set_priors(corners, w_min, w_max):
             1: uniform_dist(
                 corners[:, 1].min(), corners[:, 1].max()
                 ),
-            2: uniform_dist(
-                corners[:, 2].min(), corners[:, 2].max()
-                ),
-            3: uniform_dist(w_min, w_max),
+            2: uniform_dist(w_min, w_max),
         },
         "corner_w": {
             i: uniform_dist(w_min, w_max) for i in range(corners.shape[0])
+        },
+        "kappa": {
+            0: uniform_dist(-3, 9)
         },
     }
     return priors
 
 
 
-def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
-                    nleaves_min, nleaves_max, priors):
+def define_moves(
+        m1_min, m1_max, 
+        q_min, q_max,
+        nleaves_min, nleaves_max, priors,
+        ):
     """
     Define moves for the sampling
     """
     moves = [
         (BinGaussRelMove(
-            sigma_vertices=0.05 * np.array([m1_max - m1_min, z_max - z_min, q_max - q_min]),
+            sigma_vertices=0.05 * np.array([
+                m1_max - m1_min, 
+                q_max - q_min
+                ]),
             weights_scale=1.,
             ind_leaf=ind_leaf,
             branch_name="tri",
@@ -102,11 +108,12 @@ def define_moves(m1_min, m1_max, z_min, z_max, q_min, q_max,
     ]
     moves += [
         (StretchMove(
-            gibbs_sampling_setup=["corner_w"],
+            gibbs_sampling_setup=["corner_w", "kappa"],
             live_dangerously=True,
         ),
         0.2,)
     ]
+    moves += [(StretchMove(gibbs_sampling_setup=["kappa"], live_dangerously=True), 0.2)]
     prior_move = DistributionGenerateRJ(
         {key: ProbDistContainer(priors[key]) for key in priors},
         nleaves_min={key: val for key, val in nleaves_min.items()},
@@ -124,17 +131,13 @@ if __name__ == "__main__":
 
     # Define command line options
     parser = argparse.ArgumentParser()
-    # Random seed for mock population
-    parser.add_argument("--seed", dest='seed', help="Random seed that was used to generate the mock gw events", type=int, default=1)
-    # Number of events in mock population
-    parser.add_argument("--events", dest='events', help="Number of events in the mock population", type=int, default=153)
+    # Save dir
+    parser.add_argument("--label", dest='label', help="Name of the directory to save results", type=str, default='./')
     # Initial Delaunay
     parser.add_argument("--start", dest='Nstart', help="Number of vertices in initial Delaunay", type=int, default=10)
     # Prior range
     parser.add_argument("--m1min", dest='m1_min', help="Lower range of the primary mass distribution", type=float, default=3.0)
     parser.add_argument("--m1max", dest='m1_max', help="Upper range of the primary mass distribution", type=float, default=150.0)
-    parser.add_argument("--zmin", dest='z_min', help="Lower range of the redshift distribution", type=float, default=1e-6)
-    parser.add_argument("--zmax", dest='z_max', help="Upper range of the redshift distribution", type=float, default=1.5)
     parser.add_argument("--qmin", dest='q_min', help="Lower range of the mass ratio distribution", type=float, default=0.0)
     parser.add_argument("--qmax", dest='q_max', help="Upper range of the mass ratio distribution", type=float, default=1.0)
     parser.add_argument("--wmin", dest='w_min', help="Lower range of the uniform distribution for the weights of vertices", type=int, default=-20)
@@ -149,14 +152,12 @@ if __name__ == "__main__":
     nprocs, nwalkers, ntemps, nburn, nsteps = \
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
-
-    label = 'z_m1_q_%ievs_seed%i' %(args.events,args.seed)
-    os.makedirs(f"{label}", exist_ok=True)
+    os.makedirs(f"{args.label}", exist_ok=True)
 
     # READ data and injections
     parameter_keys = []
-    with netcdf_file('./MockCat/mock1_153evs_mock_PE_0.nc4', 'r') as f:
-        num_events = len(f.variables) - 2 
+    with netcdf_file('../MockCat/mock1_153evs_mock_PE_0.nc4', 'r') as f:
+        num_events = len(f.variables) - 2
         num_samples = int(f.dimensions["PE_sample"])
         for n in range(len(f.variables['parameter'][:])):
             param=b''
@@ -171,22 +172,11 @@ if __name__ == "__main__":
         f"Running with {num_events} events × {num_samples} samples = {num_events*num_samples} total samples"
     )
     barycenters = observed_events.reshape(
-            (num_events, num_samples, observed_events.shape[-1])
+        (num_events, num_samples, observed_events.shape[-1])
     ).mean(axis=1)
 
-    #injections_file = np.load("./injections/injections.npz")
-    #detected_injections = np.vstack(
-    #    [injections_file[key + "s_inj"] for key in parameter_keys]
-    #).T
-    #injection_logpriors = np.log(injections_file["priors_inj"])
-    #num_injections = int(injections_file["ninj"])
-    #print(
-    #    f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
-    #)
-
-    ## Run with the actual GWTC-4 injections ##
     parameter_keys = ["m1", "z", "q"]
-    injections_file = np.load("../gwax_samples/gwtc4_injections_full.npz")
+    injections_file = np.load("../../gwax_samples/gwtc4_injections_full.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
@@ -196,20 +186,16 @@ if __name__ == "__main__":
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
     )
 
-    z_min, z_max, m1_min, m1_max, q_min, q_max = \
-            args.z_min, args.z_max, args.m1_min, args.m1_max, args.q_min, args.q_max
+    m1_min, m1_max, q_min, q_max = \
+            args.m1_min, args.m1_max, args.q_min, args.q_max
     corners = np.array([
-        [m1_min, z_min, q_min],
-        [m1_min, z_min, q_max],
-        [m1_min, z_max, q_min],
-        [m1_min, z_max, q_max],
-        [m1_max, z_min, q_min],
-        [m1_max, z_min, q_max],
-        [m1_max, z_max, q_min],
-        [m1_max, z_max, q_max],
+        [m1_min, q_min],
+        [m1_min, q_max],
+        [m1_max, q_min],
+        [m1_max, q_max],
     ])
 
-    log_like_fn = M1ZQDelaunay(
+    log_like_fn = MQDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,
@@ -220,15 +206,15 @@ if __name__ == "__main__":
         corners=corners,
     )
 
-    branch_names = ["tri", "corner_w"]
-    ndims = dict(zip(branch_names, [4, 8]))
-    nleaves_min = dict(zip(branch_names, [4, 1]))
-    nleaves_max = dict(zip(branch_names, [100, 1]))
+    branch_names = ["tri", "corner_w", "kappa"]
+    ndims = dict(zip(branch_names, [3, 4, 1, 2, 3]))
+    nleaves_min = dict(zip(branch_names, [4, 1, 1, 1, 1]))
+    nleaves_max = dict(zip(branch_names, [100, 1, 1, 1, 1]))
 
     # Set priors
     priors = set_priors(corners, w_min=args.w_min, w_max=args.w_max)
 
-    backend_file = f"{label}/backend"
+    backend_file = f"{args.label}/backend"
     if not os.path.exists(backend_file):
         print("NO BACKEND; STARTING FROM SCRATCH!")
         # Initialize
@@ -265,7 +251,7 @@ if __name__ == "__main__":
                 init_proposal = {
                     "tri": np.c_[
                         make_valid_delaunay(
-                            barycenters[:, :(ndims['tri']-1)],
+                            barycenters[:, (0,2)],
                             start_with_this_many,
                             log_like_fn.corners,
                         ),
@@ -465,7 +451,8 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, z_min, z_max, q_min, q_max,
+            m1_min, m1_max, 
+            q_min, q_max,
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

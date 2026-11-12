@@ -49,7 +49,7 @@ params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
 params['m1_low']=hyper_samples[id_sample,3]
-params['m1_high']=300.
+params['m1_high']=200.
 # peak 1
 params['mu_1']=hyper_samples[id_sample,4]
 params['sigma_1']=hyper_samples[id_sample,5]
@@ -93,7 +93,7 @@ snr_th=8
 ninj=3000000
 
 
-seed=0
+seed=1
 
 np.random.seed(seed)
 
@@ -148,6 +148,6 @@ if not os.path.exists('injections/'):
 name_file_injections='injections/injections'
 
 
-np.savez(name_file_injections+'.npz',m1s_inj=m1s_inj,qs_inj=qs_inj,zs_inj=zs_inj,priors_inj=priors_inj,ninj=ninj)
+np.savez(name_file_injections+'.npz',m1s=m1s_inj,qs=qs_inj,zs=zs_inj,inj_priors=priors_inj,ninj=ninjs)
 
 #breakpoint()

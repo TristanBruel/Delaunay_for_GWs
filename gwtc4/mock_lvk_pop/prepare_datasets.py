@@ -86,7 +86,7 @@ params['alpha_1']=hyper_samples[id_sample,0]
 params['alpha_2']=hyper_samples[id_sample,1]
 params['m_break']=hyper_samples[id_sample,2]
 params['m1_low']=hyper_samples[id_sample,3]
-params['m1_high']=300.
+params['m1_high']=200.
 # peak 1
 params['mu_1']=hyper_samples[id_sample,4]
 params['sigma_1']=hyper_samples[id_sample,5]
