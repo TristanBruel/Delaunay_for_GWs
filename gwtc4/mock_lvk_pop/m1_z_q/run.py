@@ -24,7 +24,7 @@ from eryn.prior import uniform_dist, log_uniform, ProbDistContainer
 from eryn.state import State
 
 from local_utils.moves import BinGaussRelMove
-from likelihoods import SimpleDelaunay, M1ZQDelaunay
+from likelihoods import SimpleDelaunay, MZQDelaunay
 
 
 
@@ -149,12 +149,12 @@ if __name__ == "__main__":
         args.nprocs, args.nwalkers, args.ntemps, args.nburn, args.nsteps
     start_with_this_many = args.Nstart
 
-    label = 'z_m1_q_%ievs_seed%i' %(args.events,args.seed)
+    label = 'm1_z_q_%ievs_seed%i' %(args.events,args.seed)
     os.makedirs(f"{label}", exist_ok=True)
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q"]
-    filename = './datasets/samples_no_mass_gap_pop_%i_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %(args.events,args.seed)
+    filename = '../datasets/samples_no_mass_gap_pop_%i_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %(args.events,args.seed)
     data_file = np.load(filename)
     observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
@@ -165,24 +165,12 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, 3).mean(axis=1)
 
-    #injections_file = np.load("./injections/injections.npz")
-    #detected_injections = np.vstack(
-    #    [injections_file[key + "s_inj"] for key in parameter_keys]
-    #).T
-    #injection_logpriors = np.log(injections_file["priors_inj"])
-    #num_injections = int(injections_file["ninj"])
-    #print(
-    #    f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
-    #)
-
-    ## Run with the actual GWTC-4 injections ##
-    parameter_keys = ["m1", "z", "q"]
-    injections_file = np.load("../gwax_samples/gwtc4_injections_full.npz")
+    injections_file = np.load("../injections/injections.npz")
     detected_injections = np.vstack(
-        [injections_file[key + "s"] for key in parameter_keys]
+        [injections_file[key + "s_inj"] for key in parameter_keys]
     ).T
-    injection_logpriors = np.log(injections_file["inj_priors"])
-    num_injections = int(injections_file["ninjs"])
+    injection_logpriors = np.log(injections_file["priors_inj"])
+    num_injections = int(injections_file["ninj"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
     )
@@ -200,7 +188,7 @@ if __name__ == "__main__":
         [m1_max, z_max, q_max],
     ])
 
-    log_like_fn = M1ZQDelaunay(
+    log_like_fn = MZQDelaunay(
         events=observed_events,
         events_log_prior=event_logpriors,
         num_events=num_events,

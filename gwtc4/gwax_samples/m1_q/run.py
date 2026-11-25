@@ -94,8 +94,7 @@ def set_priors(corners, w_min, w_max):
 
 
 def define_moves(
-        m1_min, m1_max, 
-        q_min, q_max,
+        m1_min, m1_max, q_min, q_max,
         nleaves_min, nleaves_max, priors,
         ):
     """
@@ -451,8 +450,7 @@ if __name__ == "__main__":
 
     # Define moves
     moves, rj_moves = define_moves(
-            m1_min, m1_max, 
-            q_min, q_max,
+            m1_min, m1_max, q_min, q_max,
             nleaves_min, nleaves_max, priors,
             )
     print('Starting the sampling...')

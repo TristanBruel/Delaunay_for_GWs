@@ -159,7 +159,6 @@ class MZQDelaunay:
                 zeta_sigma_t[0], zeta_sigma_t[1], zeta_sigma_t[2],
                 )
         ).reshape(self.num_events, self.num_samples)
-
         to_integrate = log_dNdtheta - self.events_log_prior
         if (to_integrate>709).any():
             return self.minus_infinity
@@ -190,26 +189,25 @@ class MZQDelaunay:
         if (Nxi_to_integrate>709).any():
             return self.minus_infinity
         Nxi_to_sum = inj_inside_tri * np.exp(Nxi_to_integrate)
-        #Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
             / self.num_injections
             )
-        #var_Nxi *= (
-        #        self.num_events
-        #        / self.delaunay_rate.delaunay_interpolator.compute_events()
-        #        )** 2
+        var_Nxi *= (
+                self.num_events
+                / self.delaunay_rate.delaunay_interpolator.compute_events()
+                )** 2
 
         ## Threshold on effective sample size (GWTC-3) ##
-        if Nxi**2 /var_Nxi <= 4*self.num_events:
-            logger.debug("Not enough injection stuff")
-            return self.minus_infinity
+        #if Nxi**2 /var_Nxi <= 4*self.num_events:
+        #    logger.debug("Not enough injection stuff")
+        #    return self.minus_infinity
 
         ## Threshold on variance in log-likelihood estimator (GWTC-4+) ##
-        #if (var_log_NL + var_Nxi) > 1:
-        #    logger.debug(f"Variance in log-likelihood estimator exceeds 1")
-        #    return self.minus_infinity
+        if (var_log_NL + var_Nxi) > 1:
+            logger.debug(f"Variance in log-likelihood estimator exceeds 1")
+            return self.minus_infinity
 
         # Correction for the likelihood (Heinzel & Vitale 2025)
         #NL_j = NL_j * np.exp(-var_Nxi/2)

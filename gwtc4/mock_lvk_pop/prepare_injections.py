@@ -90,7 +90,7 @@ ddl_zs_spline=dl_zs_spline.derivative()
 snr_th=8
 
 
-ninj=3000000
+ninjs=int(1e7)
 
 
 seed=1
@@ -102,16 +102,16 @@ np.random.seed(seed)
 print('drawing')
 
 print('drawing m1')
-m1s_inj0=utils.draw_pl(ninj,-params['alpha_1'],params['m1_low'],params['m1_high'])
+m1s_inj0=utils.draw_pl(ninjs,-params['alpha_1'],params['m1_low'],params['m1_high'])
 print('drawing q')
-qs_inj0=utils.draw_q_no_gap(ninj,m1s_inj0,params['m1_low'],params['betaq'])
+qs_inj0=utils.draw_q_no_gap(ninjs,m1s_inj0,params['m1_low'],params['betaq'])
 m2s_inj0=m1s_inj0*qs_inj0
 
 print('drawing z')
-zs_inj0=utils.draw_z_cdf(ninj,params['kappa'],settings['dVc_spl'],settings['zmax'])
+zs_inj0=utils.draw_z_cdf(ninjs,params['kappa'],settings['dVc_spl'],settings['zmax'])
 
 
-thetas_inj0=utils.draw_thetas(ninj)
+thetas_inj0=utils.draw_thetas(ninjs)
 
 dls_injs=dl_zs_spline(zs_inj0)
 
@@ -119,7 +119,7 @@ print(np.amax(m1s_inj0*(1+zs_inj0)))
 snrs_inj0=snr_interp(np.array([m1s_inj0*(1+zs_inj0),m2s_inj0*(1+zs_inj0)]).T)*thetas_inj0*Dfix/dls_injs
 
 
-snrs_inj=snrs_inj0+np.random.normal(0,1,ninj)
+snrs_inj=snrs_inj0+np.random.normal(0,1,ninjs)
 
 mtots_inj0=m1s_inj0+m2s_inj0
 qs_inj0=m2s_inj0/m1s_inj0
@@ -148,6 +148,6 @@ if not os.path.exists('injections/'):
 name_file_injections='injections/injections'
 
 
-np.savez(name_file_injections+'.npz',m1s=m1s_inj,qs=qs_inj,zs=zs_inj,inj_priors=priors_inj,ninj=ninjs)
+np.savez(name_file_injections+'.npz',m1s=m1s_inj,qs=qs_inj,zs=zs_inj,inj_priors=priors_inj,ninjs=ninjs)
 
 #breakpoint()

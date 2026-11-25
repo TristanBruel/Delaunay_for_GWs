@@ -24,7 +24,7 @@ sample_in_mtot=0
 sample_in_z=0
 sample_in_source=0
 nsamples_ev=3194 # same number as gwax samples for GWTC-4
-nevs=153
+nevs=512
 # large_snr=1
 very_large_snr=0
 snr_th=8
@@ -469,7 +469,7 @@ for seed in seeds:
 
     if not os.path.exists('datasets/'):
         os.mkdir('datasets/')
-    np.savez('datasets/'+name_out+'.npz',m1_obs=m1_obs,q_obs=q_obs,z_obs=z_obs,priors=priors,nsamples_ev=nsamples_ev)
+    np.savez('datasets/'+name_out+'.npz',m1s=m1_obs,qs=q_obs,zs=z_obs,priors=priors,nsamples=nsamples_ev,nevents=nevs)
     np.savez('datasets/'+name_out+'_aux.npz',events=events,events_obs0=events_obs0,theta_obs0=theta_obs0,snrs_events_obs0=snrs_events_obs0,snrs_obs0=snrs_obs0,snrs_obs=snrs_obs,num_events_1=num_events_1,mtotz_obs0=mtotz_obs0,q_obs0=q_obs0,z_obs0=z_obs0)
 
 #breakpoint()

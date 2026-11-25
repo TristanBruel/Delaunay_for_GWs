@@ -161,7 +161,7 @@ if __name__ == "__main__":
 
     # READ data and injections
     parameter_keys = ["m1", "z", "q", "chi1", "chi2", "cos_tilt_1", "cos_tilt_2"]
-    data_file = np.load("./gwtc4_samples.npz")
+    data_file = np.load("../gwtc4_samples.npz")
     observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
     num_events = int(data_file["nevents"])
@@ -171,7 +171,7 @@ if __name__ == "__main__":
     )
     barycenters = observed_events.reshape(num_events, num_samples, 7).mean(axis=1)
 
-    injections_file = np.load("./gwtc4_injections_full.npz")
+    injections_file = np.load("../gwtc4_injections_full.npz")
     detected_injections = np.vstack(
         [injections_file[key + "s"] for key in parameter_keys]
     ).T
@@ -416,23 +416,10 @@ if __name__ == "__main__":
             inds[branch] = np.zeros((ntemps, nwalkers, nleaves_max[branch]), dtype=bool)
 
         ## Set initial points to last chain of previous run
-        for t, w in product(range(ntemps), range(nwalkers)):
-            for branch in branch_names:
-                coords[branch][t, w] = last_backend.chain[branch][-1, t, w]
-                inds[branch][t, w] = last_backend.inds[branch][-1, t, w]
-
-            print(t, w)
-            print(
-                log_like_fn(
-                    [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
-                )
-            )
-
-        ## Set initial points of all temperatures to last chain of first temperature (2nd and 3rd are kinda lost) ##
         #for t, w in product(range(ntemps), range(nwalkers)):
         #    for branch in branch_names:
-        #        coords[branch][t, w] = last_backend.chain[branch][-1, 0, w]
-        #        inds[branch][t, w] = last_backend.inds[branch][-1, 0, w]
+        #        coords[branch][t, w] = last_backend.chain[branch][-1, t, w]
+        #        inds[branch][t, w] = last_backend.inds[branch][-1, t, w]
 
         #    print(t, w)
         #    print(
@@ -440,6 +427,19 @@ if __name__ == "__main__":
         #            [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
         #        )
         #    )
+
+        ## Set initial points of all temperatures to last chain of first temperature (2nd and 3rd are kinda lost) ##
+        for t, w in product(range(ntemps), range(nwalkers)):
+            for branch in branch_names:
+                coords[branch][t, w] = last_backend.chain[branch][-1, 0, w]
+                inds[branch][t, w] = last_backend.inds[branch][-1, 0, w]
+
+            print(t, w)
+            print(
+                log_like_fn(
+                    [coords[branch][t, w][inds[branch][t, w]] for branch in branch_names]
+                )
+            )
 
         state = State(coords, inds=inds)
         backend = None

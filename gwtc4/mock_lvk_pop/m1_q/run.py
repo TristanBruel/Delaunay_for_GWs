@@ -160,25 +160,24 @@ if __name__ == "__main__":
     parameter_keys = ["m1", "z", "q"]
     filename = '../datasets/samples_no_mass_gap_pop_%i_evs_3194_samples_sample_in_q_zmax_1.5_seed_%s.npz' %(args.events,args.seed)
     data_file = np.load(filename)
-    observed_events = np.vstack([data_file[key + "_obs"] for key in parameter_keys]).T
+    observed_events = np.vstack([data_file[key + "s"] for key in parameter_keys]).T
     event_logpriors = np.log(data_file["priors"])
-    num_samples = int(data_file["nsamples_ev"])
-    num_events = int(observed_events.shape[0] /num_samples)
+    num_events = int(data_file["nevents"])
+    num_samples = int(data_file["nsamples"])
     print(
         f"Running with {num_events} events × {num_samples} samples = {num_events*num_samples} total samples"
     )
-    barycenters = observed_events.reshape(num_events, num_samples, observed_events.shape[-1]).mean(axis=1)
+    barycenters = observed_events.reshape(num_events, num_samples, len(parameter_keys)).mean(axis=1)
 
     injections_file = np.load("../injections/injections.npz")
     detected_injections = np.vstack(
-        [injections_file[key + "s_inj"] for key in parameter_keys]
+        [injections_file[key + "s"] for key in parameter_keys]
     ).T
-    injection_logpriors = np.log(injections_file["priors_inj"])
-    num_injections = int(injections_file["ninj"])
+    injection_logpriors = np.log(injections_file["inj_priors"])
+    num_injections = int(injections_file["ninjs"])
     print(
         f"and with {num_injections} injections, of which {np.shape(detected_injections)[0]} are detected."
     )
-
 
     m1_min, m1_max, q_min, q_max = \
             args.m1_min, args.m1_max, args.q_min, args.q_max

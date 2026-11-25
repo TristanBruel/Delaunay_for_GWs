@@ -189,7 +189,6 @@ class MZQDelaunay:
         if (Nxi_to_integrate>709).any():
             return self.minus_infinity
         Nxi_to_sum = inj_inside_tri * np.exp(Nxi_to_integrate)
-        #Nxi_to_sum = Nxi_presum * inj_inside_tri / self.detected_injections_prior
         Nxi = Nxi_to_sum.sum() / self.num_injections
         var_Nxi = (
             ((Nxi_to_sum**2).sum() / (self.num_injections - 1) - Nxi**2)
